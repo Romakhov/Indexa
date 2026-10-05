@@ -3,7 +3,19 @@
 Forget where the note lives. Indexa organizes notes by meaning.
 
 Local self-organizing knowledge graph for Obsidian: analyses the meaning of your notes
-and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Work in progress.
+and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Early version (0.0.x):
+try it on a copy of your vault first.
+
+## Getting started
+
+1. Open Indexa from the ribbon icon or the command "Indexa: Open".
+2. Run "Download local semantic model" once (~130 MB, see [Privacy and network use](#privacy-and-network-use)).
+3. Run "Analyze vault". Nothing in the vault is changed by analysis.
+4. Review the proposed indexes in the Indexes and Unclassified tabs: rename, merge, split, ignore, move notes.
+5. "Apply index structure" creates the index notes and adds `zk-indexes` links to your notes.
+   "Undo last Apply" restores every changed file.
+
+After the first Apply, new and edited notes get index suggestions automatically (incremental mode).
 
 ## Status
 
