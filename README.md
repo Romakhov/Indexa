@@ -3,7 +3,19 @@
 Forget where the note lives. Indexa organizes notes by meaning.
 
 Local self-organizing knowledge graph for Obsidian: analyses the meaning of your notes
-and proposes index notes linking related notes. Desktop only. Work in progress (Phase 0 — technical spike).
+and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Work in progress.
+
+## Status
+
+| Phase | State |
+|---|---|
+| 0 — technical spike (Gates 0a–0c) | done — reports in [`reports/`](reports/) |
+| 1 — plugin foundation: settings, main view, vault scanner, Markdown processing | done |
+| 2 — semantic pipeline: chunking, embeddings, cache, queue | next |
+
+What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
+progress and cancel (currently scanning + text preparation only), settings, model download.
+Nothing in the vault is modified.
 
 ## Privacy and network use
 
@@ -28,10 +40,15 @@ Inference runs in a Web Worker in which all `fetch`/XHR/`importScripts` calls ar
 
 ```bash
 npm install
-npm run build:vault   # builds into dev-vault/.obsidian/plugins/indexa
+npm test              # unit tests (vitest)
+npm run build         # typecheck + tests + release main.js
+npm run build:vault   # dev build with spike commands into dev-vault/.obsidian/plugins/indexa
 ```
 
+`PLUGIN_OUT_DIR=<vault>/.obsidian/plugins/indexa npm run build:vault` builds into another test vault.
+
 Run Obsidian with `--remote-debugging-port=9333`, open `dev-vault`, then drive it with
-`node scripts/cdp.mjs "<js expression>"` (see the script header).
+`node scripts/cdp.mjs "<js expression>"` (see the script header; `--screenshot file.png` captures the window,
+`--any` also targets popout and settings windows).
 
 Spike reports are in [`reports/`](reports/).

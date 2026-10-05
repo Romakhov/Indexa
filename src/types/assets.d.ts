@@ -4,3 +4,4 @@ declare module "*.wasm" {
 }
 
 declare const __WORKER_CODE__: string;
+declare const __SPIKE__: boolean;

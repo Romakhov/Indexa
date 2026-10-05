@@ -1,0 +1,98 @@
+.indexa-view {
+	padding: var(--size-4-2);
+}
+
+.indexa-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-1);
+	margin-bottom: var(--size-4-3);
+}
+
+.indexa-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-4-1);
+	font-size: var(--font-ui-small);
+}
+
+.indexa-tab.is-active {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.indexa-tab svg {
+	width: var(--icon-s);
+	height: var(--icon-s);
+}
+
+.indexa-card {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	padding: var(--size-4-3);
+	margin-bottom: var(--size-4-3);
+}
+
+.indexa-card h4 {
+	margin: 0 0 var(--size-4-2);
+}
+
+.indexa-privacy,
+.indexa-muted {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin-bottom: var(--size-4-3);
+}
+
+.indexa-ok {
+	color: var(--color-green);
+}
+
+.indexa-warn {
+	color: var(--text-warning);
+	margin-top: var(--size-4-2);
+}
+
+.indexa-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+	gap: var(--size-4-2);
+	margin-bottom: var(--size-4-2);
+}
+
+.indexa-stat-value {
+	font-size: var(--font-ui-larger);
+	font-weight: var(--font-semibold);
+	font-variant-numeric: tabular-nums;
+}
+
+.indexa-stat-label {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.indexa-stage {
+	font-weight: var(--font-semibold);
+	margin: var(--size-4-1) 0;
+}
+
+.indexa-bar {
+	height: 6px;
+	border-radius: 3px;
+	background: var(--background-modifier-border);
+	margin: var(--size-4-2) 0 var(--size-4-3);
+	overflow: hidden;
+}
+
+.indexa-bar-fill {
+	height: 100%;
+	background: var(--interactive-accent);
+	transition: width 0.2s ease;
+}
+
+.indexa-actions {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--size-4-2);
+}

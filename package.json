@@ -4,9 +4,10 @@
   "description": "Local self-organizing knowledge graph for Obsidian",
   "main": "main.js",
   "scripts": {
-    "build": "tsc --noEmit -p . && node esbuild.config.mjs --production",
+    "build": "tsc --noEmit -p . && vitest run && node esbuild.config.mjs --production",
     "build:dev": "node esbuild.config.mjs",
-    "build:vault": "node scripts/build-vault.mjs"
+    "build:vault": "node scripts/build-vault.mjs",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -17,7 +18,8 @@
     "esbuild": "^0.28.2",
     "graphology-types": "^0.24.8",
     "obsidian": "^1.13.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",
@@ -25,5 +27,8 @@
     "graphology-communities-louvain": "^2.0.2",
     "hnswlib-wasm-core": "^0.9.1"
   },
-  "private": true
+  "private": true,
+  "sideEffects": [
+    "src/embeddings/worker/*"
+  ]
 }

@@ -4,6 +4,8 @@ import path from "node:path";
 
 const prod = process.argv.includes("--production");
 const outDir = process.env.PLUGIN_OUT_DIR ?? ".";
+// Phase 0 spike commands are compiled in only for dev-vault builds.
+const spike = process.argv.includes("--spike") || process.env.INDEXA_SPIKE === "1";
 
 // Step 1: the ML worker. Runs in a Web Worker (no Node), so transformers.js
 // takes its browser code path. onnxruntime-web is forced to the CPU-only
@@ -36,12 +38,12 @@ await esbuild.build({
 	target: "es2022",
 	minify: prod,
 	external: ["obsidian", "electron", "fs", "path", "os", "crypto"],
-	define: { __WORKER_CODE__: JSON.stringify(workerCode) },
+	define: { __WORKER_CODE__: JSON.stringify(workerCode), __SPIKE__: String(spike) },
 	outfile: path.join(outDir, "main.js"),
 	logLevel: "info",
 });
 
-if (outDir !== ".") fs.copyFileSync("manifest.json", path.join(outDir, "manifest.json"));
+if (outDir !== ".") for (const f of ["manifest.json", "styles.css"]) fs.copyFileSync(f, path.join(outDir, f));
 
 const size = (f) => (fs.statSync(f).size / 1024 / 1024).toFixed(2) + " MB";
-console.log(`worker: ${(workerCode.length / 1024 / 1024).toFixed(2)} MB, main.js: ${size(path.join(outDir, "main.js"))}`);
+console.log(`spike: ${spike}, worker: ${(workerCode.length / 1024 / 1024).toFixed(2)} MB, main.js: ${size(path.join(outDir, "main.js"))}`);

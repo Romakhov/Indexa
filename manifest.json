@@ -2,7 +2,7 @@
 	"id": "indexa",
 	"name": "Indexa",
 	"version": "0.0.1",
-	"minAppVersion": "1.5.0",
+	"minAppVersion": "1.13.0",
 	"description": "Organizes notes by meaning: local semantic analysis proposes index notes. No external AI services.",
 	"author": "kdromahov",
 	"isDesktopOnly": true

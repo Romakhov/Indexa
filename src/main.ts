@@ -1,74 +1,166 @@
-import { Notice, Plugin } from "obsidian";
+import { debounce, Notice, Plugin, TFile } from "obsidian";
+import { AnalysisCancelled, AnalysisRunner, type AnalysisSummary } from "./core/AnalysisRunner";
+import { NoteIdRegistry } from "./core/NoteIdRegistry";
+import { ObsidianVaultScanner } from "./core/VaultScanner";
 import { LocalEmbeddingProvider } from "./embeddings/LocalEmbeddingProvider";
 import { E5_SMALL, ModelStore } from "./embeddings/ModelStore";
-import { runGate0a } from "./spike/gate0a";
-import { runGate0b } from "./spike/gate0b";
-import { runGate0c, type Gate0cOptions } from "./spike/gate0c";
-import { AdapterBinaryStore } from "./storage/BinaryStore";
+import { normalizeSettings, type IndexaSettings } from "./settings/Settings";
+import { registerSpikeCommands } from "./spike/registerSpikeCommands";
+import { MainView, VIEW_TYPE_INDEXA } from "./ui/MainView";
+import { IndexaSettingTab } from "./ui/SettingsTab";
+
+
+const NOTE_IDS_FILE = "note-ids.json";
 
 export default class IndexaPlugin extends Plugin {
-	onloadMs = 0;
+	declare settings: IndexaSettings;
 	modelStore!: ModelStore;
+	onloadMs = 0;
+	lastSummary: AnalysisSummary | null = null;
+
+	private noteIds = new NoteIdRegistry();
 	private provider: LocalEmbeddingProvider | null = null;
+	private analysis: AbortController | null = null;
+	private readonly saveNoteIdsSoon = debounce(() => void this.saveNoteIds(), 2000, true);
 
 	async onload() {
-		// Keep onload cheap: no model, no scanning, no worker.
+		// Spec §10: settings, commands, views, ribbon, settings tab — nothing heavy.
 		const t0 = performance.now();
+		this.settings = normalizeSettings(await this.loadData());
 		this.modelStore = new ModelStore();
 
-		this.addCommand({
-			id: "download-model",
-			name: "Download local semantic model",
-			callback: () => this.downloadModel(),
-		});
-		this.addCommand({
-			id: "spike-gate-0a",
-			name: "Spike: run Gate 0a self-test",
-			callback: () => this.runGate0a(),
-		});
+		this.registerView(VIEW_TYPE_INDEXA, (leaf) => new MainView(leaf, this));
+		this.addRibbonIcon("network", "Open Indexa", () => void this.activateView());
+		this.addSettingTab(new IndexaSettingTab(this.app, this));
 
-		this.addCommand({
-			id: "spike-gate-0b",
-			name: "Spike: run Gate 0b pipeline benchmark",
-			callback: () => this.runGate0b(),
-		});
+		this.addCommand({ id: "open", name: "Open", callback: () => void this.activateView() });
+		this.addCommand({ id: "analyze-vault", name: "Analyze vault", callback: () => void this.analyzeVault() });
+		this.addCommand({ id: "download-model", name: "Download local semantic model", callback: () => void this.downloadModel() });
+		if (__SPIKE__) registerSpikeCommands(this);
 
-		this.addCommand({
-			id: "spike-gate-0c",
-			name: "Spike: run Gate 0c on this vault",
-			callback: () => this.runGate0c(),
-		});
-
+		// Vault events only after the workspace is ready (spec §11); cheap bookkeeping only.
+		this.app.workspace.onLayoutReady(() => void this.onLayoutReady());
 		this.onloadMs = performance.now() - t0;
 	}
 
-	async runGate0b(sizes?: number[]) {
-		new Notice("Gate 0b: running…");
-		const store = new AdapterBinaryStore(this.app.vault.adapter, `${this.manifest.dir}/spike-data`);
-		const report = await runGate0b(this.app, this.getProvider(), store, sizes);
-		await this.writeReport("gate0b.json", report);
-		new Notice(`Gate 0b: ${report.passed ? "PASSED" : "FAILED"} (see console)`);
-		return report;
-	}
-
-	async runGate0c(options: Partial<Gate0cOptions> = {}) {
-		const store = new AdapterBinaryStore(this.app.vault.adapter, `${this.manifest.dir}/spike-data`);
-		const report = await runGate0c(this.app, this.getProvider(), store, options);
-		await this.writeReport(`gate0c-${report.variant.variant.split(" ")[0]}.json`, report);
-		new Notice(`Gate 0c: report written to ${report.reportNote}`);
-		return report;
-	}
-
-	private async writeReport(name: string, report: unknown) {
-		const dir = `${this.manifest.dir}/reports`;
-		if (!(await this.app.vault.adapter.exists(dir))) await this.app.vault.adapter.mkdir(dir);
-		await this.app.vault.adapter.write(`${dir}/${name}`, JSON.stringify(report, null, 2));
-		console.log(`[indexa] ${name}`, report);
-	}
-
 	async onunload() {
+		this.analysis?.abort();
+		await this.saveNoteIds();
 		await this.provider?.dispose();
 	}
+
+	private async onLayoutReady() {
+		await this.loadNoteIds();
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (file instanceof TFile) {
+					this.noteIds.rename(oldPath, file.path);
+					this.saveNoteIdsSoon();
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", (file) => {
+				if (file instanceof TFile) {
+					this.noteIds.remove(file.path);
+					this.saveNoteIdsSoon();
+				}
+			}),
+		);
+	}
+
+	// ---- settings -------------------------------------------------------
+
+	async updateSettings(patch: Partial<IndexaSettings>) {
+		this.settings = normalizeSettings({ ...this.settings, ...patch });
+		await this.saveData(this.settings);
+	}
+
+	openSettings() {
+		// Obsidian has no public API to open a specific settings tab.
+		const setting = (this.app as unknown as { setting?: { open(): void; openTabById(id: string): void } }).setting;
+		if (setting) {
+			setting.open();
+			setting.openTabById(this.manifest.id);
+		} else new Notice("Open Settings → Indexa");
+	}
+
+	// ---- storage --------------------------------------------------------
+
+	private storePath(name: string) {
+		return `${this.manifest.dir}/${name}`;
+	}
+
+	private async loadNoteIds() {
+		const p = this.storePath(NOTE_IDS_FILE);
+		if (await this.app.vault.adapter.exists(p)) {
+			try {
+				this.noteIds.load(JSON.parse(await this.app.vault.adapter.read(p)));
+			} catch (e) {
+				console.warn("[indexa] note id map unreadable, starting fresh", e);
+			}
+		}
+	}
+
+	private async saveNoteIds() {
+		if (!this.noteIds.isDirty) return;
+		await this.app.vault.adapter.write(this.storePath(NOTE_IDS_FILE), JSON.stringify(this.noteIds.serialize()));
+	}
+
+	// ---- view -----------------------------------------------------------
+
+	async activateView() {
+		const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_INDEXA)[0];
+		const leaf = existing ?? this.app.workspace.getRightLeaf(false);
+		if (!leaf) return;
+		if (!existing) await leaf.setViewState({ type: VIEW_TYPE_INDEXA, active: true });
+		await this.app.workspace.revealLeaf(leaf);
+	}
+
+	private views(): MainView[] {
+		return this.app.workspace
+			.getLeavesOfType(VIEW_TYPE_INDEXA)
+			.map((l) => l.view)
+			.filter((v): v is MainView => v instanceof MainView);
+	}
+
+	// ---- analysis -------------------------------------------------------
+
+	async analyzeVault() {
+		if (this.analysis) {
+			new Notice("Analysis is already running.");
+			return;
+		}
+		// register the controller before any await, so an immediate Cancel is never lost
+		const controller = new AbortController();
+		this.analysis = controller;
+		await this.activateView();
+		const scanner = new ObsidianVaultScanner(this.app, this.noteIds, () => ({
+			excludedFolders: [...this.settings.excludedFolders],
+			excludedTags: this.settings.excludedTags,
+			configDir: this.app.vault.configDir,
+		}));
+		try {
+			const result = await new AnalysisRunner(scanner).run((p) => this.views().forEach((v) => v.setProgress(p)), controller.signal);
+			this.lastSummary = result.summary;
+			await this.saveNoteIds();
+		} catch (e) {
+			if (e instanceof AnalysisCancelled) new Notice("Analysis cancelled. Nothing in your vault was changed.");
+			else {
+				console.error("[indexa] analysis failed", e);
+				new Notice(`Analysis failed: ${e instanceof Error ? e.message : e}`);
+			}
+		} finally {
+			this.analysis = null;
+			this.views().forEach((v) => v.setProgress(null));
+		}
+	}
+
+	cancelAnalysis() {
+		this.analysis?.abort();
+	}
+
+	// ---- model ----------------------------------------------------------
 
 	/** Lazily created; the model is loaded only on first use. */
 	getProvider(): LocalEmbeddingProvider {
@@ -76,13 +168,20 @@ export default class IndexaPlugin extends Plugin {
 		return this.provider;
 	}
 
+	isModelInstalled() {
+		return this.modelStore.isInstalled(E5_SMALL);
+	}
+
+	modelDownloadMb() {
+		return Math.round(E5_SMALL.approxBytes / 1e6);
+	}
+
 	async downloadModel() {
-		if (this.modelStore.isInstalled(E5_SMALL)) {
+		if (this.isModelInstalled()) {
 			new Notice("Local semantic model is already installed.");
 			return;
 		}
-		const mb = Math.round(E5_SMALL.approxBytes / 1e6);
-		const notice = new Notice(`Downloading local semantic model (~${mb} MB)…`, 0);
+		const notice = new Notice(`Downloading local semantic model (~${this.modelDownloadMb()} MB)…`, 0);
 		try {
 			await this.modelStore.download(E5_SMALL, (file, i, n) => notice.setMessage(`Downloading model ${i}/${n}: ${file}`));
 			notice.setMessage("Local semantic model installed.");
@@ -90,25 +189,5 @@ export default class IndexaPlugin extends Plugin {
 			notice.setMessage(`Model download failed: ${e instanceof Error ? e.message : e}`);
 		}
 		window.setTimeout(() => notice.hide(), 5000);
-	}
-
-	async runGate0a() {
-		new Notice("Gate 0a: running…");
-		try {
-			const report = await runGate0a(this.getProvider(), {
-				pluginOnloadMs: +this.onloadMs.toFixed(2),
-				modelDir: this.modelStore.dir(E5_SMALL),
-			});
-			const dir = `${this.manifest.dir}/reports`;
-			if (!(await this.app.vault.adapter.exists(dir))) await this.app.vault.adapter.mkdir(dir);
-			await this.app.vault.adapter.write(`${dir}/gate0a.json`, JSON.stringify(report, null, 2));
-			console.log("[indexa] Gate 0a report", report);
-			new Notice(`Gate 0a: ${report.passed ? "PASSED" : "FAILED"} (see console)`);
-			return report;
-		} catch (e) {
-			console.error("[indexa] Gate 0a error", e);
-			new Notice(`Gate 0a error: ${e instanceof Error ? e.message : e}`);
-			throw e;
-		}
 	}
 }
