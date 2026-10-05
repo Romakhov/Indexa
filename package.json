@@ -1,0 +1,25 @@
+{
+  "name": "structure-tree",
+  "version": "0.0.1",
+  "description": "Local self-organizing knowledge graph for Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "build": "tsc --noEmit -p . && node esbuild.config.mjs --production",
+    "build:dev": "node esbuild.config.mjs",
+    "build:vault": "node scripts/build-vault.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "esbuild": "^0.28.2",
+    "obsidian": "^1.13.1",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.3.0"
+  },
+  "private": true
+}
