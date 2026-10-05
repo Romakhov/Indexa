@@ -4,6 +4,7 @@
 
 import { cosine } from "../embeddings/EmbeddingProvider";
 import type { LocalEmbeddingProvider } from "../embeddings/LocalEmbeddingProvider";
+import { stallMonitor } from "./stall";
 
 const PAIRS = {
 	ru: {
@@ -28,21 +29,6 @@ const SAMPLE_PARAGRAPHS = [
 	"A Docker image is built from layers; ordering the Dockerfile so rarely changing steps come first keeps the build cache effective.",
 	"Чёрная дыра образуется, когда ядро массивной звезды коллапсирует под действием собственной гравитации после исчерпания топлива.",
 ];
-
-/** Measures main-thread stalls: the worst gap between 16 ms timer ticks. */
-function stallMonitor() {
-	let last = performance.now();
-	let worst = 0;
-	const t = window.setInterval(() => {
-		const now = performance.now();
-		worst = Math.max(worst, now - last);
-		last = now;
-	}, 16);
-	return () => {
-		window.clearInterval(t);
-		return worst;
-	};
-}
 
 export async function runGate0a(provider: LocalEmbeddingProvider, extra: Record<string, unknown>) {
 	const stopStall = stallMonitor();
@@ -71,7 +57,7 @@ export async function runGate0a(provider: LocalEmbeddingProvider, extra: Record<
 	const [batched] = await provider.embedBatch([texts[0], texts[1]]);
 	const singleVsBatch = cosine(single, batched);
 
-	const worstStallMs = stopStall();
+	const stall = stopStall();
 
 	const checks = {
 		modelInitialized: provider.dimensions > 0,
@@ -80,7 +66,7 @@ export async function runGate0a(provider: LocalEmbeddingProvider, extra: Record<
 		crossLingual: sims["cross:ruA~enA"] > sims["cross:ruA~ruC"],
 		// q8 dynamic quantization: padding in a batch shifts activations slightly (~0.997)
 		batchConsistent: singleVsBatch > 0.995,
-		uiResponsive: worstStallMs < 200,
+		uiResponsive: stall.worstMs < 200,
 		noNetwork: provider.blockedRequests.length === 0,
 	};
 
@@ -95,7 +81,7 @@ export async function runGate0a(provider: LocalEmbeddingProvider, extra: Record<
 		similarities: Object.fromEntries(Object.entries(sims).map(([k, v]) => [k, +v.toFixed(4)])),
 		throughput: { texts: texts.length, ms: Math.round(batchMs), textsPerSec: +((texts.length / batchMs) * 1000).toFixed(1) },
 		singleVsBatch: +singleVsBatch.toFixed(6),
-		worstMainThreadStallMs: Math.round(worstStallMs),
+		mainThreadLongTasks: stall,
 		blockedRequests: provider.blockedRequests,
 		memory: (performance as any).memory
 			? { usedJSHeapMB: Math.round((performance as any).memory.usedJSHeapSize / 1048576) }
