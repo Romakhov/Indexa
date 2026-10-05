@@ -28,7 +28,7 @@ interface ManifestItem {
 }
 
 /** Spike-only embedding cache: path+length -> vector, persisted as one binary blob. */
-class SpikeEmbeddingCache {
+export class SpikeEmbeddingCache {
 	private map = new Map<string, Float32Array>();
 	constructor(
 		private readonly store: BinaryStore,

@@ -3,6 +3,7 @@ import { LocalEmbeddingProvider } from "./embeddings/LocalEmbeddingProvider";
 import { E5_SMALL, ModelStore } from "./embeddings/ModelStore";
 import { runGate0a } from "./spike/gate0a";
 import { runGate0b } from "./spike/gate0b";
+import { runGate0c } from "./spike/gate0c";
 import { AdapterBinaryStore } from "./storage/BinaryStore";
 
 export default class IndexaPlugin extends Plugin {
@@ -32,6 +33,12 @@ export default class IndexaPlugin extends Plugin {
 			callback: () => this.runGate0b(),
 		});
 
+		this.addCommand({
+			id: "spike-gate-0c",
+			name: "Spike: run Gate 0c on this vault",
+			callback: () => this.runGate0c(),
+		});
+
 		this.onloadMs = performance.now() - t0;
 	}
 
@@ -41,6 +48,14 @@ export default class IndexaPlugin extends Plugin {
 		const report = await runGate0b(this.app, this.getProvider(), store, sizes);
 		await this.writeReport("gate0b.json", report);
 		new Notice(`Gate 0b: ${report.passed ? "PASSED" : "FAILED"} (see console)`);
+		return report;
+	}
+
+	async runGate0c() {
+		const store = new AdapterBinaryStore(this.app.vault.adapter, `${this.manifest.dir}/spike-data`);
+		const report = await runGate0c(this.app, this.getProvider(), store);
+		await this.writeReport("gate0c.json", report);
+		new Notice(`Gate 0c: report written to ${report.reportNote}`);
 		return report;
 	}
 
