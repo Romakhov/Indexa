@@ -3,6 +3,8 @@ import { AnalysisWorkerClient } from "./analysis/AnalysisWorkerClient";
 import { AnalysisCancelled, AnalysisRunner, type AnalysisResult, type AnalysisSummary } from "./core/AnalysisRunner";
 import { resolutionForDetail } from "./clustering/clusterNotes";
 import { confidenceForThreshold } from "./indexing/IndexClassifier";
+import { ReviewController } from "./review/ReviewController";
+import { reconcileIds } from "./review/ReviewState";
 import { AnalysisStore, type StoredAnalysis } from "./storage/AnalysisStore";
 import { VectorIndexService } from "./vectors/VectorIndexService";
 import { NoteIdRegistry } from "./core/NoteIdRegistry";
@@ -31,6 +33,7 @@ export default class IndexaPlugin extends Plugin {
 	lastResult: AnalysisResult | null = null;
 	/** latest proposals; survives restarts through AnalysisStore */
 	stored: StoredAnalysis | null = null;
+	readonly review = new ReviewController(this);
 
 	private noteIds = new NoteIdRegistry();
 	private provider: LocalEmbeddingProvider | null = null;
@@ -73,6 +76,7 @@ export default class IndexaPlugin extends Plugin {
 	private async onLayoutReady() {
 		await this.loadNoteIds();
 		this.stored = await this.analysisStore().load();
+		await this.review.load();
 		this.views().forEach((v) => v.render());
 		this.registerEvent(
 			this.app.vault.on("rename", (file, oldPath) => {
@@ -192,8 +196,10 @@ export default class IndexaPlugin extends Plugin {
 			this.lastSummary = result.summary;
 			this.lastResult = result;
 			if (result.proposals) {
-				this.stored = { version: 1, proposals: result.proposals, paths: Object.fromEntries(result.notes.map((n) => [n.id, n.path])) };
-				await this.analysisStore().save(this.stored);
+				// keep ids of indexes that mostly kept their notes, so review decisions carry over
+				const proposals = reconcileIds(this.stored?.proposals ?? null, result.proposals);
+				this.stored = { version: 1, proposals, paths: Object.fromEntries(result.notes.map((n) => [n.id, n.path])) };
+				await this.saveStored();
 			}
 			await this.saveNoteIds();
 		} catch (e) {
@@ -207,6 +213,36 @@ export default class IndexaPlugin extends Plugin {
 			this.analysis = null;
 			this.views().forEach((v) => v.setProgress(null));
 		}
+		if (this.lastResult?.proposals && !this.reapplyingSplits) {
+			this.reapplyingSplits = true;
+			try {
+				await this.review.reapplySplits();
+			} finally {
+				this.reapplyingSplits = false;
+			}
+		}
+	}
+
+	private reapplyingSplits = false;
+
+	async saveStored() {
+		if (this.stored) await this.analysisStore().save(this.stored);
+	}
+
+	refreshViews() {
+		this.views().forEach((v) => v.render());
+	}
+
+	/** current path of a note id (falls back to the path seen at analysis time) */
+	pathOf(noteId: string): string | undefined {
+		return this.noteIds.pathOf(noteId) ?? this.stored?.paths[noteId];
+	}
+
+	noteIdFor(path: string): string {
+		const id = this.noteIds.idFor(path);
+		if (this.stored) this.stored.paths[id] = path;
+		this.saveNoteIdsSoon();
+		return id;
 	}
 
 	cancelAnalysis() {

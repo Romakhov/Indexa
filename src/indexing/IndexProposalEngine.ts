@@ -79,6 +79,8 @@ export function buildProposals(
 	const proposals: IndexProposal[] = [];
 	/** centroid of each topic proposal, by position in `proposals` */
 	const topicCentroids: Float32Array[] = [];
+	/** classifier index k -> proposal id (topics that survived) */
+	const proposalOfIndex = new Map<number, string>();
 	cls.indexes.forEach((_, k) => {
 		const ms = members[k].sort((a, b) => Number(b.primary) - Number(a.primary) || b.score - a.score);
 		const primaryIds = ms.filter((m) => m.primary).map((m) => m.noteId);
@@ -103,6 +105,7 @@ export function buildProposals(
 			related: [],
 		});
 		topicCentroids.push(cls.centroids[k]);
+		proposalOfIndex.set(k, proposals[proposals.length - 1].id);
 	});
 
 	// related topics by centroid similarity (spec §59): only clearly related pairs
@@ -145,10 +148,17 @@ export function buildProposals(
 	for (const p of proposals) for (const m of p.members) placed.add(m.noteId);
 	const unclassified = notes.filter((n) => !placed.has(n.id)).map((n) => n.id);
 
+	const suggestions: ProposalSet["suggestions"] = {};
+	for (const id of unclassified) {
+		const s = (cls.suggestions.get(id) ?? []).filter((x) => proposalOfIndex.has(x.index)).map((x) => ({ proposalId: proposalOfIndex.get(x.index)!, score: +x.score.toFixed(3) }));
+		if (s.length) suggestions[id] = s;
+	}
+
 	return {
 		createdAt: Date.now(),
 		proposals,
 		unclassified,
+		suggestions,
 		stats: {
 			contentNotes: content.length,
 			lowContentNotes: notes.length - content.length,

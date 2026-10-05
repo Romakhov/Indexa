@@ -1,6 +1,7 @@
 import { ItemView, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import { STAGES, type Progress } from "../core/AnalysisRunner";
 import type IndexaPlugin from "../main";
+import { ReviewPanels } from "./ReviewPanels";
 
 export const VIEW_TYPE_INDEXA = "indexa-main";
 
@@ -17,12 +18,14 @@ const nf = new Intl.NumberFormat();
 export class MainView extends ItemView {
 	private tab: Tab = "overview";
 	private progress: Progress | null = null;
+	private panels: ReviewPanels;
 
 	constructor(
 		leaf: WorkspaceLeaf,
 		private readonly plugin: IndexaPlugin,
 	) {
 		super(leaf);
+		this.panels = new ReviewPanels(this.app, plugin);
 	}
 
 	getViewType() {
@@ -68,9 +71,13 @@ export class MainView extends ItemView {
 
 		const body = root.createDiv({ cls: "indexa-body" });
 		if (this.tab === "overview") this.renderOverview(body);
-		else if (this.tab === "indexes") this.renderIndexes(body);
-		else if (this.tab === "unclassified") this.renderUnclassified(body);
-		else this.renderPlaceholder(body);
+		else {
+			const review = this.plugin.review.effective();
+			if (!review) this.renderPlaceholder(body);
+			else if (this.tab === "indexes") this.panels.renderIndexes(body, review);
+			else if (this.tab === "unclassified") this.panels.renderUnclassified(body, review);
+			else this.panels.renderReview(body, review);
+		}
 	}
 
 	private renderOverview(el: HTMLElement) {
@@ -153,62 +160,7 @@ export class MainView extends ItemView {
 		cancel.onclick = () => this.plugin.cancelAnalysis();
 	}
 
-	private noteLink(el: HTMLElement, noteId: string) {
-		const path = this.plugin.stored?.paths[noteId];
-		if (!path) return;
-		const title = path.split("/").pop()!.replace(/.md$/, "");
-		const a = el.createEl("a", { cls: "indexa-note-link", text: title, href: "#" });
-		a.onclick = (e) => {
-			e.preventDefault();
-			void this.app.workspace.openLinkText(path, "", false);
-		};
-	}
-
-	private renderIndexes(el: HTMLElement) {
-		const set = this.plugin.stored?.proposals;
-		if (!set) {
-			this.renderPlaceholder(el);
-			return;
-		}
-		const topics = set.proposals.filter((p) => p.kind === "topic");
-		const collections = set.proposals.filter((p) => p.kind === "collection");
-		el.createDiv({ cls: "indexa-muted", text: `${topics.length} suggested indexes · ${collections.length} collections · preview only, nothing is written until Apply` });
-		const list = el.createDiv({ cls: "indexa-index-list" });
-		const nameOf = (id: string) => set.proposals.find((p) => p.id === id)?.name.primary ?? "Unnamed topic";
-		for (const p of [...topics, ...collections]) {
-			const primary = p.members.filter((m) => m.primary);
-			const secondary = p.members.length - primary.length;
-			const card = list.createDiv({ cls: "indexa-card indexa-index" });
-			const head = card.createDiv({ cls: "indexa-index-head" });
-			head.createSpan({ cls: "indexa-index-name" + (p.name.primary ? "" : " is-unnamed"), text: p.name.primary ?? "Unnamed topic" });
-			head.createSpan({ cls: "indexa-index-count", text: secondary ? `${primary.length} + ${secondary}` : String(primary.length) });
-			if (p.kind === "collection") card.createDiv({ cls: "indexa-muted", text: `Collection · ${p.signature}` });
-			else {
-				card.createDiv({ cls: "indexa-keywords", text: p.name.keywords.slice(0, 6).join(" · ") });
-				card.createDiv({ cls: "indexa-muted", text: `confidence ${Math.round(p.confidence * 100)}%${p.name.alternatives.length ? " · also: " + p.name.alternatives.slice(0, 3).join(", ") : ""}` });
-			}
-			const samples = card.createDiv({ cls: "indexa-samples" });
-			p.sampleNoteIds.slice(0, 4).forEach((id) => this.noteLink(samples, id));
-			if (p.related.length) card.createDiv({ cls: "indexa-muted", text: "Related: " + p.related.map((r) => nameOf(r.proposalId)).join(", ") });
-		}
-	}
-
-	private renderUnclassified(el: HTMLElement) {
-		const set = this.plugin.stored?.proposals;
-		if (!set) {
-			this.renderPlaceholder(el);
-			return;
-		}
-		el.createDiv({ cls: "indexa-muted", text: `${set.unclassified.length} notes without a confident index. This is expected: not every note has to belong somewhere.` });
-		const list = el.createDiv({ cls: "indexa-samples indexa-unclassified" });
-		set.unclassified.slice(0, 300).forEach((id) => this.noteLink(list, id));
-		if (set.unclassified.length > 300) el.createDiv({ cls: "indexa-muted", text: `… and ${set.unclassified.length - 300} more` });
-	}
-
 	private renderPlaceholder(el: HTMLElement) {
-		el.createDiv({
-			cls: "indexa-muted",
-			text: this.tab === "review" && this.plugin.stored ? "Reviewing and editing proposals arrives in the next phase." : "Run Analyze vault on the Overview tab first.",
-		});
+		el.createDiv({ cls: "indexa-muted", text: "Run Analyze vault on the Overview tab first." });
 	}
 }

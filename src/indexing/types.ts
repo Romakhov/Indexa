@@ -33,6 +33,8 @@ export interface IndexProposal {
 	related: { proposalId: string; similarity: number }[];
 	/** collections: the metadata that defines them, e.g. "type: фильм" */
 	signature?: string;
+	/** set on the parts of an index the user split */
+	splitFrom?: string;
 }
 
 export interface ProposalSet {
@@ -40,6 +42,8 @@ export interface ProposalSet {
 	proposals: IndexProposal[];
 	/** notes without a confident place (spec §48) */
 	unclassified: string[];
+	/** for unclassified notes: closest indexes with a fit percentile, for one-click assignment */
+	suggestions: Record<string, { proposalId: string; score: number }[]>;
 	stats: {
 		contentNotes: number;
 		lowContentNotes: number;

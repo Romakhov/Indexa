@@ -64,6 +64,8 @@ export interface ClassifierResult {
 	/** note id -> memberships (primary first) */
 	memberships: Map<string, Membership[]>;
 	unclassified: string[];
+	/** best-fitting indexes for unclassified notes, to offer in Review */
+	suggestions: Map<string, { index: number; score: number }[]>;
 	dissolved: number;
 	/** sorted core-member similarities per index, for percentile scores and later incremental assignment */
 	coreScores: number[][];
@@ -143,6 +145,7 @@ export function classify(notes: ClassifierNote[], communities: Map<string, numbe
 	// 5: score every note against every centroid (document + best chunk)
 	const memberships = new Map<string, Membership[]>();
 	const unclassified: string[] = [];
+	const suggestions = new Map<string, { index: number; score: number }[]>();
 	for (const n of notes) {
 		const fits: Membership[] = centroids.map((cv, k) => {
 			const doc = dot(n.vector, cv);
@@ -170,14 +173,29 @@ export function classify(notes: ClassifierNote[], communities: Map<string, numbe
 		}
 		if (!out.length) {
 			unclassified.push(n.id);
+			suggestions.set(
+				n.id,
+				// closest indexes by similarity; the percentile is usually ~0 for unclassified
+				// notes (they are further out than members), so it only labels the chip
+				fits
+					.filter((f) => f.score > 0)
+					.sort((a, b) => b.score - a.score)
+					.slice(0, 3)
+					.map((f) => ({ index: f.index, score: fitPercentile(f.index, f.score) })),
+			);
 			continue;
 		}
+		// a secondary index needs support from the note's own neighbourhood: at least one
+		// close neighbour already sits there (chunk matches may instead be strong on their own)
+		const near = n.neighbors.slice(0, o.neighborsForAgreement);
+		const supported = (k: number) => near.some((id) => coreIndexOf.get(id) === k);
 		const secondary = fits
 			.filter((f) => f.index !== out[0].index && f.score >= thresholds[f.index].secondary)
+			.filter((f) => supported(f.index) || (f.via === "chunk" && f.score >= thresholds[f.index].rescue))
 			.sort((a, b) => b.score - a.score)
 			.slice(0, o.maxIndexesPerNote - 1)
 			.map((f) => ({ ...f, score: fitPercentile(f.index, f.score) }));
 		memberships.set(n.id, [...out, ...secondary]);
 	}
-	return { indexes, centroids, memberships, unclassified, dissolved, coreScores };
+	return { indexes, centroids, memberships, unclassified, suggestions, dissolved, coreScores };
 }

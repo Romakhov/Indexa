@@ -34,6 +34,8 @@ describe("IndexNamingEngine", () => {
 		expect(isGenericName("Misc")).toBe(true);
 		expect(isGenericName("Разное")).toBe(true);
 		expect(isGenericName("Kafka")).toBe(false);
+		expect(isGenericName("Scan-2026-09-17")).toBe(true);
+		expect(isGenericName("GPT-6")).toBe(false);
 	});
 
 	it("prefers a shared title phrase in the user's own form", () => {

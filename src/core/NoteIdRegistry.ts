@@ -26,6 +26,11 @@ export class NoteIdRegistry {
 		return id;
 	}
 
+	pathOf(id: string): string | undefined {
+		for (const [p, i] of this.byPath) if (i === id) return p;
+		return undefined;
+	}
+
 	peek(path: string): string | undefined {
 		return this.byPath.get(path);
 	}

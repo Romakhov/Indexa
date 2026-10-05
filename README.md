@@ -15,7 +15,8 @@ and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Wo
 | 3 — vector search: HNSW index in a worker, rebuild from cache, top-K | done |
 | 4 — hybrid similarity graph + Louvain in the worker; clustering benchmark | done |
 | 5 — proposals: confidence + unclassified, multi-index (incl. chunks), collections, names, related | done |
-| 6 — review UI: rename, merge, ignore, add/remove notes, secondary memberships | next |
+| 6 — review UI: rename, merge, split, ignore, add/remove notes, main/secondary index, unclassified | done |
+| 7 — apply + undo: index notes, frontmatter, change sets | next |
 
 What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
 progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache,
@@ -96,3 +97,10 @@ communities above 15% of the vault. "Level of detail" maps to Louvain resolution
   metadata (`type`, tag, or a folder) instead of meaning.
 - **Names**: shared title phrases (the user's own vocabulary), concentrated tags, top keywords;
   generic names (Notes, Misc, Разное…) are never proposed; otherwise "Unnamed topic" + keywords.
+
+## Review (spec §52–54)
+
+Proposals are recomputed on every analysis; the user's decisions (rename, merge, split, ignore,
+add/remove notes, main index of a note) are stored separately (`review.json`) and layered on top.
+After re-analysis, new proposals inherit the ids of old ones that kept most of their notes
+(member overlap), so decisions keep applying. Split indexes are split again deterministically.

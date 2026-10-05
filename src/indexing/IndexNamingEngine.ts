@@ -20,7 +20,9 @@ const GENERIC = new Set(
 
 export function isGenericName(name: string): boolean {
 	const n = name.trim().toLowerCase();
-	return !n || GENERIC.has(n) || /^\d+$/.test(n) || n.length < 3;
+	// dates and serial numbers ("scan-2026-09-17", "PABO-C3-2026") are file names, not topics
+	const digits = (n.match(/\d/g) ?? []).length;
+	return !n || GENERIC.has(n) || /^\d+$/.test(n) || n.length < 3 || digits >= 4 || /\d{4}-\d{2}/.test(n);
 }
 
 /** Stem-keyed phrase statistics over all note titles of the vault. */
