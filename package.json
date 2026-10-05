@@ -1,6 +1,6 @@
 {
   "name": "indexa",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Organizes notes by meaning: local semantic analysis proposes index notes.",
   "main": "main.js",
   "scripts": {

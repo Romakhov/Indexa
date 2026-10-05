@@ -106,7 +106,7 @@ export default class IndexaPlugin extends Plugin {
 		await this.review.load();
 		await this.applier.refresh();
 		await this.incremental.queue.load();
-		this.views().forEach((v) => v.render());
+		await this.refreshModelInstalled();
 		// spec §11: events only once the workspace is ready; handlers only enqueue work
 		this.registerEvent(this.app.vault.on("create", (file) => this.incremental.onCreate(file)));
 		this.registerEvent(this.app.vault.on("modify", (file) => this.incremental.onModify(file)));
@@ -406,11 +406,21 @@ export default class IndexaPlugin extends Plugin {
 		return this.cache;
 	}
 
-	/** cached: the view asks on every progress update, and the check is synchronous file I/O */
-	private modelInstalled: boolean | null = null;
+	/** cached: the view asks on every render; refreshed from IndexedDB on load and after a download */
+	private modelInstalled = false;
 
 	isModelInstalled() {
-		this.modelInstalled ??= this.modelStore.isInstalled(E5_SMALL);
+		return this.modelInstalled;
+	}
+
+	async refreshModelInstalled() {
+		try {
+			this.modelInstalled = await this.modelStore.isInstalled(E5_SMALL);
+		} catch (e) {
+			console.warn("[indexa] model store unavailable", e);
+			this.modelInstalled = false;
+		}
+		this.refreshViews();
 		return this.modelInstalled;
 	}
 
@@ -419,14 +429,14 @@ export default class IndexaPlugin extends Plugin {
 	}
 
 	async downloadModel() {
-		if (this.isModelInstalled()) {
+		if (await this.refreshModelInstalled()) {
 			new Notice("Local semantic model is already installed.");
 			return;
 		}
 		const notice = new Notice(`Downloading local semantic model (~${this.modelDownloadMb()} MB)…`, 0);
 		try {
 			await this.modelStore.download(E5_SMALL, (file, i, n) => notice.setMessage(`Downloading model ${i}/${n}: ${file}`));
-			this.modelInstalled = null;
+			await this.refreshModelInstalled();
 			notice.setMessage("Local semantic model installed.");
 		} catch (e) {
 			notice.setMessage(`Model download failed: ${e instanceof Error ? e.message : e}`);

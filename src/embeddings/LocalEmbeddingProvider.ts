@@ -1,5 +1,6 @@
 import type { EmbeddingProvider } from "./EmbeddingProvider";
 import type { ModelSpec, ModelStore } from "./ModelStore";
+import { ortWasmBinary } from "./ortWasm";
 import type { WorkerRequest, WorkerResponse } from "./worker/protocol";
 
 // method syntax: each request resolves with its own reply type
@@ -38,8 +39,9 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 	}
 
 	private async doInitialize(): Promise<void> {
-		if (!this.store.isInstalled(this.spec)) throw new Error("Local semantic model is not installed");
+		if (!(await this.store.isInstalled(this.spec))) throw new Error("Local semantic model is not installed");
 		const files = await this.store.readAll(this.spec);
+		const ortWasm = await ortWasmBinary();
 
 		this.workerUrl = URL.createObjectURL(new Blob([__WORKER_CODE__], { type: "text/javascript" }));
 		this.worker = new Worker(this.workerUrl, { name: "indexa-embeddings" });
@@ -47,8 +49,8 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 		this.worker.onerror = (ev) => this.failAll(new Error(`Embedding worker crashed: ${ev.message}`));
 
 		const res = await this.request(
-			{ type: "init", modelId: this.spec.id, dtype: this.spec.dtype, device: this.device, files },
-			Object.values(files),
+			{ type: "init", modelId: this.spec.id, dtype: this.spec.dtype, device: this.device, files, ortWasm },
+			[...Object.values(files), ortWasm],
 		);
 		this.dimensions = res.dimensions;
 		this.initInfo = { loadMs: res.loadMs, backend: res.backend };

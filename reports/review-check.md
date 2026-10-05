@@ -15,7 +15,7 @@
 | Rule ID | Severity | Status | Location | Message | Remediation |
 | --- | --- | --- | --- | --- | --- |
 | bundle-inline-wasm | warning | failed | main.js | The bundle contains inline base64 data with a WebAssembly magic header. | This is an advisory preflight check; the authoritative scan runs at release against the published bundle. main.js bundles dependencies, so this finding may originate from a third-party package rather than the author’s own source. |
-| bundle-wasm-reference | recommendation | failed | main.js | The bundle references WebAssembly file(s): ort-wasm-simd-threaded.wasm, ort.wasm, .wasm, ?!ZA.wasm, :Nd(t.wasm, env.wasm, o=B?.wasm, {$E(A.wasm, !!OA.wasm, !B.in.wasm, &&(B.in.wasm, Nd(OA.wasm, OA.wasm, \|\|OA.wasm, &&(OA.wasm, A=OA.wasm, \|\|!Number.isInteger(OA.wasm, XA?.wasm, &&XA?.wasm, &&XA?.wasm?.wasmPaths?.wasm. | This is an advisory preflight check; the authoritative scan runs at release against the published bundle. main.js bundles dependencies, so this finding may originate from a third-party package rather than the author’s own source. |
+| bundle-wasm-reference | recommendation | failed | main.js | The bundle references WebAssembly file(s): ort-wasm-simd-threaded.wasm, ort.wasm, .wasm, ?!Qe.wasm, :Nl(r.wasm, env.wasm, l=n?.wasm, {gh(e.wasm, !!Ie.wasm, !n.in.wasm, &&(n.in.wasm, Nl(Ie.wasm, Ie.wasm, \|\|Ie.wasm, &&(Ie.wasm, e=Ie.wasm, \|\|!Number.isInteger(Ie.wasm, We?.wasm, &&We?.wasm, &&We?.wasm?.wasmPaths?.wasm. | This is an advisory preflight check; the authoritative scan runs at release against the published bundle. main.js bundles dependencies, so this finding may originate from a third-party package rather than the author’s own source. |
 
 ## scanner-stylelint
 

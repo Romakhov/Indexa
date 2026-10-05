@@ -58,14 +58,18 @@ run "Download local semantic model"**.
 | Model | [`Xenova/multilingual-e5-small`](https://huggingface.co/Xenova/multilingual-e5-small) (ONNX port of `intfloat/multilingual-e5-small`), q8 |
 | Licence | MIT |
 | Source | `huggingface.co`, pinned to commit `761b726dd34fb83930e26aab4e9ac3899aa1fa78` |
-| Size | ~130 MB on disk |
-| Stored in | Windows `%APPDATA%\indexa\models`, macOS `~/Library/Application Support/indexa/models`, Linux `$XDG_DATA_HOME/indexa/models` |
+| Size | ~130 MB |
+| Stored in | Obsidian's own browser storage (IndexedDB `indexa-models`), not in the vault |
 
 The model is kept outside the vault so it is shared between vaults and is not copied by vault sync.
-The ONNX Runtime WebAssembly binary is bundled inside `main.js`; nothing is loaded from a CDN.
+The plugin does not access files outside the vault.
+The ONNX Runtime WebAssembly binary is bundled inside `main.js` (brotli-compressed, see below); nothing is loaded from a CDN.
 No executable code is ever downloaded: the model download contains weights, tokenizer and config files only.
 Embeddings are cached in the plugin folder (`cache/`, a few MB per thousand notes); vectors are never written into notes.
 Inference runs in a Web Worker in which all `fetch`/XHR/`importScripts` calls are blocked.
+
+To analyse the vault, Indexa reads every Markdown file that is not excluded in the settings
+(Settings → Excluded folders). It writes only when you run Apply or Undo.
 
 ## Development
 
@@ -198,12 +202,16 @@ Current result: **0 errors**, scanner ESLint and Stylelint clean. Remaining bund
 
 | Finding | Severity | Why it is there |
 |---|---|---|
-| `bundle-inline-wasm` | warning (advisory) | `onnxruntime-web` 1.31.0-dev.20260914-8d85527a0 `ort-wasm-simd-threaded.wasm`, unmodified, embedded as base64 so no code is fetched at runtime. Verifiable: the build prints its size and the bytes are the npm package's file. |
-| `bundle-wasm-reference` | recommendation | file-name strings inside the ONNX Runtime glue code; with `wasmBinary` set they are never fetched (the worker blocks all network access). |
+| `bundle-inline-wasm` | warning (advisory) | the WASM build of `hnswlib-wasm-core` (0.6 MB), inlined as base64 by that npm package itself. |
+| `bundle-wasm-reference` | recommendation | file-name strings inside the ONNX Runtime glue code; the binary is passed in directly, so they are never fetched (the worker blocks all network access). |
 
-The alternative to the embedded WASM — downloading it next to the model — was rejected: it would move
-executable code out of the reviewed bundle and into a runtime download, which is what the developer policies forbid.
-Re-encoding the binary to hide it from the detector would be obfuscation and is not done either.
+**The ONNX Runtime binary.** `main.js` contains `ort-wasm-simd-threaded.wasm` of `onnxruntime-web`
+1.31.0-dev.20260914-8d85527a0, unmodified, compressed with brotli (quality 11, window 24) at build time.
+The only reason is size: raw it is 14.3 MB, compressed 2.3 MB, which keeps `main.js` (4.5 MB) under the 5 MB
+file limit of Obsidian Sync. It is decompressed with Node's `zlib` when the embedding worker starts
+(`src/embeddings/ortWasm.ts`, `esbuild.config.mjs`). The build is reproducible byte-for-byte, so the bytes can be
+checked against the npm package. Downloading the binary at runtime instead was rejected: plugins must not
+install their dependencies.
 
 ### Bundled third-party components
 

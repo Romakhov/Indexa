@@ -1,11 +1,8 @@
-// Stores the embedding model outside the vault, in the OS per-user app-data
-// directory, so it is shared between vaults and never picked up by vault sync.
-// Uses Node APIs (the plugin is isDesktopOnly).
+// Stores the embedding model in IndexedDB of the Obsidian app (origin
+// app://obsidian.md): shared between vaults, never part of a vault, so vault
+// sync does not copy it, and no file system access outside the vault is needed.
 
 import { requestUrl } from "obsidian";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
 
 export interface ModelSpec {
 	/** Hugging Face repo id; also the transformers.js model id. */
@@ -29,47 +26,90 @@ export const E5_SMALL: ModelSpec = {
 	dims: 384,
 };
 
-const APP_DIR = "indexa";
+const DB_NAME = "indexa-models";
+const STORE = "files";
+/** written after the last file, so an interrupted download never looks installed */
+const COMPLETE = ".complete";
 
-export function appDataDir(): string {
-	if (process.platform === "win32") return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), APP_DIR);
-	if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", APP_DIR);
-	return path.join(process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share"), APP_DIR);
-}
+const done = <T>(req: IDBRequest<T>) =>
+	new Promise<T>((resolve, reject) => {
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error ?? new Error("IndexedDB request failed"));
+	});
 
 export class ModelStore {
-	constructor(readonly root: string = path.join(appDataDir(), "models")) {}
+	private db: Promise<IDBDatabase> | null = null;
 
-	dir(spec: ModelSpec): string {
-		return path.join(this.root, ...spec.id.split("/"), spec.revision);
+	constructor(private readonly dbName = DB_NAME) {}
+
+	/** Where the model lives, for reports and the README. */
+	location(spec: ModelSpec): string {
+		return `IndexedDB ${this.dbName}/${this.prefix(spec)}`;
 	}
 
-	isInstalled(spec: ModelSpec): boolean {
-		return spec.files.every((f) => fs.existsSync(path.join(this.dir(spec), f)));
+	private prefix(spec: ModelSpec) {
+		return `${spec.id}@${spec.revision}/`;
+	}
+
+	private open(): Promise<IDBDatabase> {
+		this.db ??= new Promise<IDBDatabase>((resolve, reject) => {
+			const req = indexedDB.open(this.dbName, 1);
+			req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+			req.onsuccess = () => resolve(req.result);
+			req.onerror = () => reject(req.error ?? new Error("IndexedDB unavailable"));
+		}).catch((e: unknown) => {
+			this.db = null;
+			throw e;
+		});
+		return this.db;
+	}
+
+	private async get(key: string): Promise<ArrayBuffer | undefined> {
+		const db = await this.open();
+		return done(db.transaction(STORE, "readonly").objectStore(STORE).get(key) as IDBRequest<ArrayBuffer | undefined>);
+	}
+
+	private async put(key: string, value: ArrayBuffer): Promise<void> {
+		const db = await this.open();
+		const tx = db.transaction(STORE, "readwrite");
+		tx.objectStore(STORE).put(value, key);
+		await new Promise<void>((resolve, reject) => {
+			tx.oncomplete = () => resolve();
+			tx.onerror = tx.onabort = () => reject(tx.error ?? new Error("IndexedDB write failed"));
+		});
+	}
+
+	private async has(key: string): Promise<boolean> {
+		const db = await this.open();
+		return (await done(db.transaction(STORE, "readonly").objectStore(STORE).count(key))) > 0;
+	}
+
+	async isInstalled(spec: ModelSpec): Promise<boolean> {
+		return this.has(this.prefix(spec) + COMPLETE);
 	}
 
 	/** Explicit user action only. The only network request the plugin makes. */
 	async download(spec: ModelSpec, onProgress?: (file: string, i: number, n: number) => void): Promise<void> {
-		const dir = this.dir(spec);
+		// ask the app not to evict the model under storage pressure (best effort)
+		await navigator.storage?.persist?.().catch(() => false);
 		for (let i = 0; i < spec.files.length; i++) {
 			const file = spec.files[i];
-			const target = path.join(dir, file);
-			if (fs.existsSync(target)) continue;
+			const key = this.prefix(spec) + file;
+			if (await this.has(key)) continue;
 			onProgress?.(file, i + 1, spec.files.length);
 			const url = `https://huggingface.co/${spec.id}/resolve/${spec.revision}/${file}`;
 			const res = await requestUrl({ url, throw: true });
-			fs.mkdirSync(path.dirname(target), { recursive: true });
-			// write to a temp name first so an interrupted download never looks installed
-			fs.writeFileSync(target + ".part", Buffer.from(res.arrayBuffer));
-			fs.renameSync(target + ".part", target);
+			await this.put(key, res.arrayBuffer);
 		}
+		await this.put(this.prefix(spec) + COMPLETE, new ArrayBuffer(0));
 	}
 
 	async readAll(spec: ModelSpec): Promise<Record<string, ArrayBuffer>> {
 		const out: Record<string, ArrayBuffer> = {};
 		for (const file of spec.files) {
-			const buf = await fs.promises.readFile(path.join(this.dir(spec), file));
-			out[file] = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+			const buf = await this.get(this.prefix(spec) + file);
+			if (!buf) throw new Error(`Model file missing: ${file}. Run "Download local semantic model" again.`);
+			out[file] = buf;
 		}
 		return out;
 	}

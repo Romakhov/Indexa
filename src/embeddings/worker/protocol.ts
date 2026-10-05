@@ -8,6 +8,8 @@ export interface InitRequest {
 	device: "wasm" | "webgpu";
 	/** Model files keyed by path relative to the model root, e.g. "onnx/model_quantized.onnx". */
 	files: Record<string, ArrayBuffer>;
+	/** ONNX Runtime WASM binary (decompressed on the main thread, see ortWasm.ts) */
+	ortWasm: ArrayBuffer;
 }
 
 export interface EmbedRequest {

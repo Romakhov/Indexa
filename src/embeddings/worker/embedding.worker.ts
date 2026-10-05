@@ -62,14 +62,13 @@ Object.assign(ctx, {
 });
 
 // transformers.js is loaded lazily in init(), i.e. strictly after the guard
-// above is installed. The wasm import below is just embedded bytes.
-import wasmBinary from "indexa-ort-wasm";
+// above is installed.
 
 type Extractor = (texts: string[], opts: Record<string, unknown>) => Promise<{ data: Float32Array; dims: number[] }>;
 let extractor: (Extractor & { dispose?: () => Promise<void> }) | null = null;
 let dimensions = 0;
 
-async function init(modelId: string, dtype: string, files: Record<string, ArrayBuffer>, device: "wasm" | "webgpu") {
+async function init(modelId: string, dtype: string, files: Record<string, ArrayBuffer>, device: "wasm" | "webgpu", wasmBinary: ArrayBuffer) {
 	const t0 = performance.now();
 	modelFiles = new Map(Object.entries(files));
 	modelRoot = `${LOCAL_ROOT}${modelId}/`;
@@ -117,7 +116,7 @@ ctx.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
 	const req = ev.data;
 	try {
 		if (req.type === "init") {
-			const { loadMs, backend } = await init(req.modelId, req.dtype, req.files, req.device);
+			const { loadMs, backend } = await init(req.modelId, req.dtype, req.files, req.device, req.ortWasm);
 			post({ type: "init", id: req.id, dimensions, loadMs, backend });
 		} else if (req.type === "embed") {
 			const t0 = performance.now();

@@ -32,7 +32,7 @@ export function registerSpikeCommands(plugin: IndexaPlugin) {
 		async gate0a() {
 			const report = await runGate0a(plugin.getProvider(), {
 				pluginOnloadMs: +plugin.onloadMs.toFixed(2),
-				modelDir: plugin.modelStore.dir(E5_SMALL),
+				modelDir: plugin.modelStore.location(E5_SMALL),
 			});
 			await writeReport("gate0a.json", report);
 			new Notice(`Gate 0a: ${report.passed ? "PASSED" : "FAILED"}`);
