@@ -3,6 +3,7 @@ import { AnalysisWorkerClient } from "./analysis/AnalysisWorkerClient";
 import { AnalysisCancelled, AnalysisRunner, type AnalysisResult, type AnalysisSummary } from "./core/AnalysisRunner";
 import { resolutionForDetail } from "./clustering/clusterNotes";
 import { confidenceForThreshold } from "./indexing/IndexClassifier";
+import { ApplyController } from "./obsidian/ApplyController";
 import { ReviewController } from "./review/ReviewController";
 import { reconcileIds } from "./review/ReviewState";
 import { AnalysisStore, type StoredAnalysis } from "./storage/AnalysisStore";
@@ -34,6 +35,7 @@ export default class IndexaPlugin extends Plugin {
 	/** latest proposals; survives restarts through AnalysisStore */
 	stored: StoredAnalysis | null = null;
 	readonly review = new ReviewController(this);
+	readonly applier = new ApplyController(this);
 
 	private noteIds = new NoteIdRegistry();
 	private provider: LocalEmbeddingProvider | null = null;
@@ -58,6 +60,8 @@ export default class IndexaPlugin extends Plugin {
 		this.addCommand({ id: "open", name: "Open", callback: () => void this.activateView() });
 		this.addCommand({ id: "analyze-vault", name: "Analyze vault", callback: () => void this.analyzeVault() });
 		this.addCommand({ id: "download-model", name: "Download local semantic model", callback: () => void this.downloadModel() });
+		this.addCommand({ id: "apply", name: "Apply index structure", callback: () => void this.applier.confirmAndApply() });
+		this.addCommand({ id: "undo-apply", name: "Undo last Apply", callback: () => void this.applier.confirmAndUndo() });
 		if (__SPIKE__) registerSpikeCommands(this);
 
 		// Vault events only after the workspace is ready (spec §11); cheap bookkeeping only.
@@ -77,6 +81,7 @@ export default class IndexaPlugin extends Plugin {
 		await this.loadNoteIds();
 		this.stored = await this.analysisStore().load();
 		await this.review.load();
+		await this.applier.refresh();
 		this.views().forEach((v) => v.render());
 		this.registerEvent(
 			this.app.vault.on("rename", (file, oldPath) => {

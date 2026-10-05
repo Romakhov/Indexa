@@ -157,8 +157,13 @@ export class ReviewPanels {
 		card.createDiv({ cls: "indexa-muted", text: `${review.decisions} change(s) made by you. They are kept when you analyse again.` });
 		const actions = card.createDiv({ cls: "indexa-actions" });
 		const apply = actions.createEl("button", { cls: "mod-cta", text: "Apply…" });
-		apply.disabled = true;
-		setTooltip(apply, "Writing index notes arrives in the next phase");
+		apply.onclick = () => void p.applier.confirmAndApply();
+		const last = p.applier.lastUndoable;
+		if (last) {
+			const undo = actions.createEl("button", { text: "Undo last Apply" });
+			setTooltip(undo, `Applied ${new Date(last.timestamp).toLocaleString()}`);
+			undo.onclick = () => void p.applier.confirmAndUndo();
+		}
 		if (review.decisions) {
 			const reset = actions.createEl("button", { text: "Discard my changes" });
 			reset.onclick = () => void p.review.reset();

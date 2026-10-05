@@ -16,7 +16,8 @@ and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Wo
 | 4 — hybrid similarity graph + Louvain in the worker; clustering benchmark | done |
 | 5 — proposals: confidence + unclassified, multi-index (incl. chunks), collections, names, related | done |
 | 6 — review UI: rename, merge, split, ignore, add/remove notes, main/secondary index, unclassified | done |
-| 7 — apply + undo: index notes, frontmatter, change sets | next |
+| 7 — apply + undo: index notes, zk-indexes, change journal, stacked undo | done |
+| 8 — incremental mode: new / changed / renamed / deleted notes | next |
 
 What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
 progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache,
@@ -104,3 +105,20 @@ Proposals are recomputed on every analysis; the user's decisions (rename, merge,
 add/remove notes, main index of a note) are stored separately (`review.json`) and layered on top.
 After re-analysis, new proposals inherit the ids of old ones that kept most of their notes
 (member overlap), so decisions keep applying. Split indexes are split again deterministically.
+
+## Apply and Undo (spec §55–58, §76, §95–96)
+
+- Index notes are created in the index folder (`zk-type: index`, `zk-generated: true`). If a note with
+  the same name already exists there, it is not overwritten: Indexa adds its own section only.
+- Notes get `zk-type: note` and `zk-indexes` in their frontmatter. YAML is edited as text: only
+  these keys are added or replaced; every other byte (comments, quoting, empty values, CRLF) stays.
+- Indexa writes body text only between `%% indexa:start %%` and `%% indexa:end %%`.
+- Links use the shortest unambiguous path, so notes with the same name in different folders work.
+- Renames (an index renamed after Apply, optional note moves) bypass Obsidian's link updater, which
+  would re-serialise the frontmatter of every linking note; only the affected link strings change.
+- Every Apply is an ordered journal with the original text of each file. Undo replays it backwards:
+  untouched files come back byte-for-byte, files edited since lose only Indexa's keys and section,
+  created index notes go to the Obsidian trash. Undo works as a stack over the last 10 Applies.
+
+Verified on a 954-note vault copy: Apply (16 created, 827 updated, 0 broken links) → Undo → all
+954 files identical to the snapshot taken before; also with a renamed index and user edits in between.
