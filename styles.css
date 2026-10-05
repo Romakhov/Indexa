@@ -225,3 +225,14 @@
 	flex: 0 1 auto;
 	margin: 0;
 }
+
+.indexa-notice-list {
+	margin: var(--size-4-1) 0;
+	font-weight: var(--font-semibold);
+}
+
+.indexa-notice-actions {
+	display: flex;
+	gap: var(--size-4-2);
+	margin-top: var(--size-4-2);
+}

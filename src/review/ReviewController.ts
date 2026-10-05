@@ -36,7 +36,13 @@ export class ReviewController {
 
 	effective(): EffectiveReview | null {
 		const set = this.plugin.stored?.proposals;
-		return set ? applyReview(set, this.state) : null;
+		if (!set) return null;
+		const r = applyReview(set, this.state);
+		// notes deleted since the analysis disappear from indexes and from Unclassified
+		const exists = (id: string) => this.plugin.pathOf(id) !== undefined;
+		for (const i of r.indexes) i.members = i.members.filter((m) => exists(m.noteId));
+		r.unclassified = r.unclassified.filter(exists);
+		return r;
 	}
 
 	/** follows merges: the index a (possibly merged-away) proposal id ends up in */

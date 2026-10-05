@@ -4,6 +4,7 @@ import { Modal, Notice, Setting, type App } from "obsidian";
 import { planApply, type ApplyPlan, type VaultView } from "../indexing/IndexBuilder";
 import type IndexaPlugin from "../main";
 import { ChangeHistoryStore } from "../storage/ChangeHistoryStore";
+import { contentHash } from "../core/hash";
 import { Applier, summarize, type ChangeSet } from "./Applier";
 
 class ConfirmModal extends Modal {
@@ -48,6 +49,17 @@ export class ApplyController {
 		this.history = new ChangeHistoryStore(plugin.app.vault.adapter, plugin.manifest.dir!);
 	}
 
+	/** Tells the incremental processor which files hold text Indexa just wrote. */
+	private async markOwnWrites(cs: ChangeSet) {
+		const paths = new Set(cs.ops.flatMap((o) => (o.op === "modify" ? [o.patch.path] : o.op === "create" ? [o.path] : o.op === "rename" ? [o.to, o.from] : [])));
+		const writes: { path: string; hash: string }[] = [];
+		for (const path of paths) {
+			const f = this.plugin.app.vault.getFileByPath(path);
+			if (f) writes.push({ path, hash: contentHash(await this.plugin.app.vault.read(f)) });
+		}
+		this.plugin.incremental.recordOwnWrites(writes);
+	}
+
 	async refresh() {
 		this.lastUndoable = await this.history.last();
 	}
@@ -90,6 +102,55 @@ export class ApplyController {
 		});
 	}
 
+	/** Is an index structure applied (and not undone)? */
+	async isApplied(): Promise<boolean> {
+		return Object.keys((await this.history.state()).indexFiles).length > 0;
+	}
+
+	/**
+	 * Incremental Apply for single notes (spec §60–61): the notes' frontmatter and
+	 * the index notes they belong to; nothing else. Only once a structure is applied.
+	 */
+	async applyNotes(noteIds: string[]) {
+		if (this.busy || !(await this.isApplied())) return;
+		const plan = await this.plan();
+		if (!plan) return;
+		const ids = new Set(noteIds);
+		const scoped = {
+			...plan,
+			indexes: plan.indexes.filter((i) => i.noteIds.some((id) => ids.has(id))),
+			notes: plan.notes.filter((n) => ids.has(n.noteId)),
+			clearNotes: [],
+			staleIndexes: [],
+			moves: [],
+		};
+		if (!scoped.notes.length) return;
+		// index sections list all their members, so their other notes must be in the plan's lookup
+		scoped.notes = plan.notes.filter((n) => ids.has(n.noteId) || scoped.indexes.some((i) => i.noteIds.includes(n.noteId)));
+		const notesToWrite = new Set(noteIds);
+		this.busy = true;
+		try {
+			const state = await this.history.state();
+			const cs = await this.plugin.incremental.quietly(() =>
+				new Applier(this.plugin.app).apply(
+					{ ...scoped, notes: scoped.notes },
+					state.indexFiles,
+					{ addFrontmatter: this.plugin.settings.addFrontmatter, addVisibleIndexLinks: this.plugin.settings.addVisibleIndexLinks },
+					undefined,
+					notesToWrite,
+				),
+			);
+			if (cs.ops.length) {
+				await this.markOwnWrites(cs);
+				cs.indexFiles = { ...state.indexFiles, ...cs.indexFiles };
+				await this.history.record(cs);
+				this.lastUndoable = cs;
+			}
+		} finally {
+			this.busy = false;
+		}
+	}
+
 	async confirmAndApply() {
 		if (this.busy) return;
 		const plan = await this.plan();
@@ -116,12 +177,13 @@ export class ApplyController {
 		const notice = new Notice("Indexa: applying…", 0);
 		try {
 			const state = await this.history.state();
-			const cs = await new Applier(this.plugin.app).apply(
+			const cs = await this.plugin.incremental.quietly(() => new Applier(this.plugin.app).apply(
 				plan,
 				state.indexFiles,
 				{ addFrontmatter: this.plugin.settings.addFrontmatter, addVisibleIndexLinks: this.plugin.settings.addVisibleIndexLinks },
 				(p) => notice.setMessage(`Indexa: applying… ${p.done} / ${p.total}`),
-			);
+			));
+			await this.markOwnWrites(cs);
 			await this.history.record(cs);
 			this.lastUndoable = cs;
 			const s = summarize(cs);
@@ -164,7 +226,8 @@ export class ApplyController {
 		this.busy = true;
 		const notice = new Notice("Indexa: undoing…", 0);
 		try {
-			const res = await new Applier(this.plugin.app).undo(cs, (p) => notice.setMessage(`Indexa: undoing… ${p.done} / ${p.total}`));
+			const res = await this.plugin.incremental.quietly(() => new Applier(this.plugin.app).undo(cs, (p) => notice.setMessage(`Indexa: undoing… ${p.done} / ${p.total}`)));
+			await this.markOwnWrites(cs);
 			await this.history.markUndone(cs);
 			this.lastUndoable = null;
 			notice.setMessage(

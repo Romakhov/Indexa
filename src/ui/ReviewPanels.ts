@@ -148,8 +148,33 @@ export class ReviewPanels {
 		if (review.unclassified.length > 300) el.createDiv({ cls: "indexa-muted", text: `… and ${review.unclassified.length - 300} more` });
 	}
 
+	/** Suggestions for new and changed notes (spec §61–62). */
+	private renderQueue(el: HTMLElement, review: EffectiveReview) {
+		const p = this.plugin;
+		const items = p.incremental.queue.items;
+		if (!items.length) return;
+		const names = new Map(review.indexes.map((i) => [i.id, i.name]));
+		const card = el.createDiv({ cls: "indexa-card" });
+		card.createEl("h4", { text: `New and changed notes (${items.length})` });
+		const list = card.createDiv({ cls: "indexa-members" });
+		for (const item of items.slice(0, 100)) {
+			const row = list.createDiv({ cls: "indexa-member" });
+			this.noteLink(row, item.noteId);
+			row.createSpan({ cls: "indexa-badge", text: item.kind === "new" ? "new" : "changed" });
+			const chips = row.createSpan({ cls: "indexa-chips" });
+			for (const s of item.suggestions) {
+				const label = `${names.get(p.review.resolve(s.indexId)) ?? "?"}${s.via === "collection" ? "" : " " + pct(s.score)}`;
+				const b = chips.createEl("button", { cls: "indexa-chip", text: label });
+				setTooltip(b, s.via === "chunk" && s.heading ? `Matches the section "${s.heading.split(" › ").pop()}"` : "Add the note to this index");
+				b.onclick = () => void p.incremental.accept(item.noteId, p.review.resolve(s.indexId));
+			}
+			iconButton(chips, "x", "Ignore these suggestions", () => void p.incremental.dismiss(item.noteId));
+		}
+	}
+
 	renderReview(el: HTMLElement, review: EffectiveReview) {
 		const p = this.plugin;
+		this.renderQueue(el, review);
 		const live = review.indexes.filter((i) => !i.ignored);
 		const card = el.createDiv({ cls: "indexa-card" });
 		card.createEl("h4", { text: "Review" });

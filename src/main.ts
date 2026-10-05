@@ -3,6 +3,7 @@ import { AnalysisWorkerClient } from "./analysis/AnalysisWorkerClient";
 import { AnalysisCancelled, AnalysisRunner, type AnalysisResult, type AnalysisSummary } from "./core/AnalysisRunner";
 import { resolutionForDetail } from "./clustering/clusterNotes";
 import { confidenceForThreshold } from "./indexing/IndexClassifier";
+import { IncrementalProcessor } from "./incremental/IncrementalProcessor";
 import { ApplyController } from "./obsidian/ApplyController";
 import { ReviewController } from "./review/ReviewController";
 import { reconcileIds } from "./review/ReviewState";
@@ -36,6 +37,8 @@ export default class IndexaPlugin extends Plugin {
 	stored: StoredAnalysis | null = null;
 	readonly review = new ReviewController(this);
 	readonly applier = new ApplyController(this);
+	/** created in onload (needs settings) */
+	incremental!: IncrementalProcessor;
 
 	private noteIds = new NoteIdRegistry();
 	private provider: LocalEmbeddingProvider | null = null;
@@ -52,6 +55,7 @@ export default class IndexaPlugin extends Plugin {
 		const t0 = performance.now();
 		this.settings = normalizeSettings(await this.loadData());
 		this.modelStore = new ModelStore();
+		this.incremental = new IncrementalProcessor(this);
 
 		this.registerView(VIEW_TYPE_INDEXA, (leaf) => new MainView(leaf, this));
 		this.addRibbonIcon("network", "Open Indexa", () => void this.activateView());
@@ -61,6 +65,16 @@ export default class IndexaPlugin extends Plugin {
 		this.addCommand({ id: "analyze-vault", name: "Analyze vault", callback: () => void this.analyzeVault() });
 		this.addCommand({ id: "download-model", name: "Download local semantic model", callback: () => void this.downloadModel() });
 		this.addCommand({ id: "apply", name: "Apply index structure", callback: () => void this.applier.confirmAndApply() });
+		this.addCommand({
+			id: "suggest-current",
+			name: "Suggest indexes for the current note",
+			checkCallback: (checking) => {
+				const f = this.app.workspace.getActiveFile();
+				if (!f || f.extension !== "md") return false;
+				if (!checking) void this.suggestFor(f);
+				return true;
+			},
+		});
 		this.addCommand({ id: "undo-apply", name: "Undo last Apply", callback: () => void this.applier.confirmAndUndo() });
 		if (__SPIKE__) registerSpikeCommands(this);
 
@@ -71,6 +85,7 @@ export default class IndexaPlugin extends Plugin {
 
 	async onunload() {
 		this.analysis?.abort();
+		this.incremental?.dispose();
 		await this.saveNoteIds();
 		await this.provider?.dispose();
 		await this.disposePool();
@@ -80,25 +95,95 @@ export default class IndexaPlugin extends Plugin {
 	private async onLayoutReady() {
 		await this.loadNoteIds();
 		this.stored = await this.analysisStore().load();
+		this.lastSummary ??= this.stored?.summary ?? null;
 		await this.review.load();
 		await this.applier.refresh();
+		await this.incremental.queue.load();
 		this.views().forEach((v) => v.render());
+		// spec §11: events only once the workspace is ready; handlers only enqueue work
+		this.registerEvent(this.app.vault.on("create", (file) => this.incremental.onCreate(file)));
+		this.registerEvent(this.app.vault.on("modify", (file) => this.incremental.onModify(file)));
 		this.registerEvent(
 			this.app.vault.on("rename", (file, oldPath) => {
 				if (file instanceof TFile) {
 					this.noteIds.rename(oldPath, file.path);
 					this.saveNoteIdsSoon();
+					void this.incremental.onRename(file, oldPath);
 				}
 			}),
 		);
 		this.registerEvent(
 			this.app.vault.on("delete", (file) => {
 				if (file instanceof TFile) {
+					const id = this.noteIds.peek(file.path);
 					this.noteIds.remove(file.path);
 					this.saveNoteIdsSoon();
+					void this.incremental.onDelete(file.path, id);
 				}
 			}),
 		);
+	}
+
+	// ---- incremental mode helpers --------------------------------------
+
+	scanner() {
+		return new ObsidianVaultScanner(this.app, this.noteIds, () => ({
+			excludedFolders: [...this.settings.excludedFolders],
+			excludedTags: this.settings.excludedTags,
+			configDir: this.app.vault.configDir,
+		}));
+	}
+
+	isAnalysing() {
+		return this.analysis !== null;
+	}
+
+	/** notes known from the last analysis (plus notes processed since) */
+	knownNoteIds(): string[] {
+		return Object.keys(this.stored?.paths ?? {});
+	}
+
+	contentNoteIds(): string[] {
+		return this.stored?.contentIds ?? this.knownNoteIds();
+	}
+
+	rememberPath(noteId: string, path: string) {
+		if (this.stored && this.stored.paths[noteId] !== path) {
+			this.stored.paths[noteId] = path;
+			void this.saveStored();
+		}
+	}
+
+	forgetNote(noteId: string) {
+		if (this.stored?.paths[noteId]) {
+			delete this.stored.paths[noteId];
+			void this.saveStored();
+		}
+		this.refreshViews();
+	}
+
+	async openTab(tab: "overview" | "indexes" | "unclassified" | "review") {
+		await this.activateView();
+		this.views().forEach((v) => v.setTab(tab));
+	}
+
+	async suggestFor(file: TFile) {
+		const n = new Notice("Indexa: looking for indexes…", 0);
+		try {
+			const r = await this.incremental.runNow(file);
+			const msg: Record<string, string> = {
+				suggested: "suggestions added to Review",
+				"no-new-indexes": "no new indexes to suggest",
+				excluded: "this note is excluded from analysis",
+				skipped: "run Analyze vault first (and install the model)",
+				unchanged: "nothing changed",
+				assigned: "added to its best index",
+			};
+			n.setMessage(`Indexa: ${msg[r.status]}`);
+			if (r.status === "suggested") void this.openTab("review");
+		} finally {
+			window.setTimeout(() => n.hide(), 4000);
+		}
 	}
 
 	// ---- settings -------------------------------------------------------
@@ -106,6 +191,7 @@ export default class IndexaPlugin extends Plugin {
 	async updateSettings(patch: Partial<IndexaSettings>) {
 		this.settings = normalizeSettings({ ...this.settings, ...patch });
 		await this.saveData(this.settings);
+		this.incremental?.setDebounce(this.settings.debounceMs);
 	}
 
 	openSettings() {
@@ -167,11 +253,7 @@ export default class IndexaPlugin extends Plugin {
 		const controller = new AbortController();
 		this.analysis = controller;
 		await this.activateView();
-		const scanner = new ObsidianVaultScanner(this.app, this.noteIds, () => ({
-			excludedFolders: [...this.settings.excludedFolders],
-			excludedTags: this.settings.excludedTags,
-			configDir: this.app.vault.configDir,
-		}));
+		const scanner = this.scanner();
 		const embedding = this.isModelInstalled()
 			? {
 					provider: this.getPool(),
@@ -203,7 +285,14 @@ export default class IndexaPlugin extends Plugin {
 			if (result.proposals) {
 				// keep ids of indexes that mostly kept their notes, so review decisions carry over
 				const proposals = reconcileIds(this.stored?.proposals ?? null, result.proposals);
-				this.stored = { version: 1, proposals, paths: Object.fromEntries(result.notes.map((n) => [n.id, n.path])) };
+				this.stored = {
+					version: 1,
+					proposals,
+					paths: Object.fromEntries(result.notes.map((n) => [n.id, n.path])),
+					templateLines: result.templateLines,
+					contentIds: result.processed.filter((p) => !p.lowContent).map((p) => p.noteId),
+					summary: result.summary,
+				};
 				await this.saveStored();
 			}
 			await this.saveNoteIds();

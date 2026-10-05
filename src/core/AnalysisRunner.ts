@@ -118,6 +118,8 @@ export interface AnalysisResult {
 	proposals?: ProposalSet;
 	/** inputs of the proposal engine, kept in memory for re-runs (detail/threshold changes, benchmarks) */
 	proposalNotes?: ProposalNote[];
+	/** template lines detected over the vault (reused for single-note processing) */
+	templateLines: string[];
 }
 
 export class AnalysisCancelled extends Error {
@@ -329,6 +331,7 @@ export class AnalysisRunner {
 			keywords,
 			proposals: proposalSet,
 			proposalNotes: proposalNotesOut,
+			templateLines: templates.toArray(),
 			summary: {
 				proposals: proposalSet && {
 					topics: proposalSet.proposals.filter((p) => p.kind === "topic").length,

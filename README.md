@@ -17,7 +17,8 @@ and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Wo
 | 5 — proposals: confidence + unclassified, multi-index (incl. chunks), collections, names, related | done |
 | 6 — review UI: rename, merge, split, ignore, add/remove notes, main/secondary index, unclassified | done |
 | 7 — apply + undo: index notes, zk-indexes, change journal, stacked undo | done |
-| 8 — incremental mode: new / changed / renamed / deleted notes | next |
+| 8 — incremental mode: new / changed / renamed / deleted notes, review queue | done |
+| 9 — large-vault stabilisation: 2k / 5k / 10k benchmarks | next |
 
 What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
 progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache,
@@ -122,3 +123,18 @@ After re-analysis, new proposals inherit the ids of old ones that kept most of t
 
 Verified on a 954-note vault copy: Apply (16 created, 827 updated, 0 broken links) → Undo → all
 954 files identical to the snapshot taken before; also with a renamed index and user edits in between.
+
+## Incremental mode (spec §11–13, §60–63, §94)
+
+After the first analysis, Indexa follows the vault: create / modify events are debounced per note
+(default 3 s) and processed one at a time. A new or meaningfully changed note is embedded on its
+own, the vector index is updated in place, and the note is scored against the centres of the
+current indexes (after your review decisions). Suggestions appear as a notice with
+**Add · Review · Ignore** and in the Review tab. With "Ask before assigning" off, a note without
+an index gets its best one directly. Once a structure is applied, adding a note writes only that
+note and its index notes (journaled, undoable). Small edits (vector almost unchanged) update the
+cache silently; renames keep the note id and its embedding; deletions remove vector, cache entry
+and memberships. Indexa's own writes are recognised by content and never re-processed.
+
+Measured on the 954-note vault copy: new note → suggestion in ~1.3 s after the debounce
+(model loaded lazily), 5 rapid edits → 1 job.

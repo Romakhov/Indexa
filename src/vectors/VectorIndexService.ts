@@ -102,6 +102,29 @@ export class VectorIndexService {
 		return { upserted: toUpsert.length, removed: toRemove.length, rebuilt: needsRebuild, stats };
 	}
 
+	/** Builds the index from the cache if the worker has none yet (e.g. after a restart). */
+	async ensureBuilt(cache: EmbeddingCache, liveIds: Iterable<string>, meanIds: Iterable<string>) {
+		if (this.client.running && this.synced.size > 0 && this.mean) return;
+		await this.sync(cache, liveIds, { meanIds });
+	}
+
+	/** Incremental update of one note (spec §60); no rebuild, no other notes touched. */
+	async upsertOne(entry: CachedEmbedding) {
+		if (!this.mean) throw new Error("Vector index is not built yet");
+		if (this.synced.get(entry.noteId) === entry.contentHash) return;
+		await this.client.upsert([{ id: entry.noteId, vector: centered(entry.documentVector, this.mean) }]);
+		this.synced.set(entry.noteId, entry.contentHash);
+		this.changedSinceMean++;
+	}
+
+	async remove(ids: string[]) {
+		const present = ids.filter((id) => this.synced.has(id));
+		if (!present.length || !this.client.running) return;
+		await this.client.remove(present);
+		present.forEach((id) => this.synced.delete(id));
+		this.changedSinceMean += present.length;
+	}
+
 	knnAll(k: number, onProgress?: (done: number, total: number) => void): Promise<NeighborTable> {
 		return this.client.knnAll(k, onProgress);
 	}

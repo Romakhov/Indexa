@@ -160,7 +160,8 @@ export class Applier {
 		}
 	}
 
-	async apply(plan: ApplyPlan, previousIndexFiles: Record<string, string>, settings: ApplySettings, onProgress?: (p: ApplyProgress) => void): Promise<ChangeSet> {
+	/** @param onlyNotes when set, only these notes' files are written (incremental Apply) */
+	async apply(plan: ApplyPlan, previousIndexFiles: Record<string, string>, settings: ApplySettings, onProgress?: (p: ApplyProgress) => void, onlyNotes?: Set<string>): Promise<ChangeSet> {
 		const cs: ChangeSet = { id: `apply-${Date.now()}`, timestamp: Date.now(), ops: [], previousIndexFiles, indexFiles: {}, errors: [] };
 		const total = plan.indexes.length * 2 + plan.notes.length + plan.clearNotes.length + plan.staleIndexes.length + plan.moves.length;
 		let done = 0;
@@ -222,6 +223,7 @@ export class Applier {
 
 		// 3. member notes: zk-type / zk-indexes and the optional visible section
 		for (const n of plan.notes) {
+			if (onlyNotes && !onlyNotes.has(n.noteId)) continue;
 			await guard(n.path, async () => {
 				const f = this.file(n.path);
 				if (!f) throw new Error("note not found");

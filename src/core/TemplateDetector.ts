@@ -34,6 +34,14 @@ export class TemplateLines {
 	has(line: string): boolean {
 		return this.lines.has(normalizeLine(line));
 	}
+
+	toArray(): string[] {
+		return [...this.lines];
+	}
+
+	static fromArray(lines: string[] | undefined) {
+		return new TemplateLines(new Set(lines ?? []));
+	}
 }
 
 /** @param bodies per note: its cleaned body lines */

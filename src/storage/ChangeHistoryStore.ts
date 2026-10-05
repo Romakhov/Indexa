@@ -12,7 +12,7 @@ interface ApplyState {
 	history: string[];
 }
 
-const KEEP = 10;
+const KEEP = 50;
 
 export class ChangeHistoryStore {
 	constructor(

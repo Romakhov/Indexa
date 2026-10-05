@@ -44,6 +44,11 @@ export class MainView extends ItemView {
 		this.render();
 	}
 
+	setTab(tab: Tab) {
+		this.tab = tab;
+		this.render();
+	}
+
 	/** Called by the plugin whenever analysis state changes. */
 	setProgress(p: Progress | null) {
 		this.progress = p;

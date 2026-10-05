@@ -2,6 +2,7 @@
 // No vectors here: names, memberships and the note paths needed to show them.
 
 import type { DataAdapter } from "obsidian";
+import type { AnalysisSummary } from "../core/AnalysisRunner";
 import type { ProposalSet } from "../indexing/types";
 
 export interface StoredAnalysis {
@@ -9,6 +10,11 @@ export interface StoredAnalysis {
 	proposals: ProposalSet;
 	/** note id -> path at analysis time */
 	paths: Record<string, string>;
+	/** for single-note processing after a restart */
+	templateLines?: string[];
+	/** notes with enough own text (define the index mean) */
+	contentIds?: string[];
+	summary?: AnalysisSummary;
 }
 
 export class AnalysisStore {

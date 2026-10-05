@@ -50,6 +50,14 @@ export class ObsidianVaultScanner implements VaultScanner {
 		return { notes, excluded, total: files.length };
 	}
 
+	/** One file, with the same exclusion rules as a full scan (null = excluded). */
+	async scanFile(file: TFile): Promise<NoteDocument | null> {
+		const cache = this.app.metadataCache.getFileCache(file);
+		const tags = (cache ? (getAllTags(cache) ?? []) : []).map((t) => t.replace(/^#/, ""));
+		if (exclusionReason({ path: file.path, frontmatter: cache?.frontmatter, tags }, this.rules())) return null;
+		return this.toDocument(file, tags);
+	}
+
 	private async toDocument(file: TFile, tags: string[]): Promise<NoteDocument> {
 		const cache = this.app.metadataCache.getFileCache(file);
 		const links = [...(cache?.links ?? []), ...(cache?.frontmatterLinks ?? [])].map(
