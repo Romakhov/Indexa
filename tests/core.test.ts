@@ -24,6 +24,7 @@ describe("exclusionReason", () => {
 	});
 	it("excludes drawings and the config dir", () => {
 		expect(exclusionReason(meta("Excalidraw/x.excalidraw.md"), rules)).toBe("drawing");
+		expect(exclusionReason(meta("Files/Контент-завод.md", { "excalidraw-plugin": "parsed" }), rules)).toBe("drawing");
 		expect(exclusionReason(meta(".obsidian/plugins/x/README.md"), rules)).toBe("config");
 	});
 });

@@ -11,11 +11,16 @@ and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Wo
 |---|---|
 | 0 — technical spike (Gates 0a–0c) | done — reports in [`reports/`](reports/) |
 | 1 — plugin foundation: settings, main view, vault scanner, Markdown processing | done |
-| 2 — semantic pipeline: chunking, embeddings, cache, queue | next |
+| 2 — semantic pipeline: chunking, embeddings, cache, queue | done |
+| 3 — vector search: HNSW index, persistence, top-K (in the worker) | next |
 
 What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
-progress and cancel (currently scanning + text preparation only), settings, model download.
-Nothing in the vault is modified.
+progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache),
+settings, model download. Nothing in the vault is modified.
+
+Measured on a real 932-note vault (Windows, 16 threads): first analysis ≈4 min with 2 embedding
+workers, re-analysis from cache 0.3 s. Each worker holds its own model copy (~0.5 GB RAM); workers are
+released after 5 minutes without semantic work.
 
 ## Privacy and network use
 
@@ -34,6 +39,7 @@ run "Download local semantic model"**.
 
 The model is kept outside the vault so it is shared between vaults and is not copied by vault sync.
 The ONNX Runtime WebAssembly binary is bundled inside `main.js`; nothing is loaded from a CDN.
+Embeddings are cached in the plugin folder (`cache/`, a few MB per thousand notes); vectors are never written into notes.
 Inference runs in a Web Worker in which all `fetch`/XHR/`importScripts` calls are blocked.
 
 ## Development

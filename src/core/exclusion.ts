@@ -29,9 +29,10 @@ const tagMatches = (tag: string, excluded: string) => {
 
 export function exclusionReason(note: NoteMeta, rules: ExclusionRules): ExclusionReason | null {
 	if (inFolder(note.path, rules.configDir)) return "config";
-	if (note.path.endsWith(".excalidraw.md")) return "drawing";
-	if (rules.excludedFolders.some((f) => inFolder(note.path, f))) return "folder";
 	const fm = note.frontmatter ?? {};
+	// Excalidraw drawings, also when the file name lacks the .excalidraw suffix
+	if (note.path.endsWith(".excalidraw.md") || fm["excalidraw-plugin"] !== undefined) return "drawing";
+	if (rules.excludedFolders.some((f) => inFolder(note.path, f))) return "folder";
 	if (fm["zk-ignore"] === true || fm["zk-ignore"] === "true") return "frontmatter";
 	// generated index notes are proposals' output, not input (spec §14)
 	if (fm["zk-type"] === "index") return "generated-index";

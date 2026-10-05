@@ -1,0 +1,20 @@
+{
+  "device": "wasm",
+  "cpuThreads": 16,
+  "sampleNotes": 160,
+  "texts": 767,
+  "avgChars": 897,
+  "baselineMemoryMb": 933,
+  "results": [
+    {
+      "workers": 1,
+      "initMs": 1842,
+      "ms": 190924,
+      "textsPerSec": 4,
+      "notesPerSec": 0.8,
+      "rendererMemoryMb": 1463,
+      "memoryOverBaselineMb": 530,
+      "blockedRequests": 0
+    }
+  ]
+}
