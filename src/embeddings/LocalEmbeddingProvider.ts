@@ -25,6 +25,7 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 		private readonly spec: ModelSpec,
 		/** E5 models expect a task prefix; "query: " is the one for symmetric similarity / clustering. */
 		private readonly prefix = "query: ",
+		private readonly device: "wasm" | "webgpu" = "wasm",
 	) {}
 
 	initialize(): Promise<void> {
@@ -45,7 +46,7 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 		this.worker.onerror = (ev) => this.failAll(new Error(`Embedding worker crashed: ${ev.message}`));
 
 		const res = await this.request(
-			{ type: "init", modelId: this.spec.id, dtype: this.spec.dtype, files },
+			{ type: "init", modelId: this.spec.id, dtype: this.spec.dtype, device: this.device, files },
 			Object.values(files),
 		);
 		this.dimensions = res.dimensions;

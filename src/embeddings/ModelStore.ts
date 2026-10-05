@@ -16,6 +16,7 @@ export interface ModelSpec {
 	files: string[];
 	approxBytes: number;
 	license: string;
+	dims: number;
 }
 
 export const E5_SMALL: ModelSpec = {
@@ -25,6 +26,7 @@ export const E5_SMALL: ModelSpec = {
 	files: ["config.json", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json", "onnx/model_quantized.onnx"],
 	approxBytes: 135_500_000,
 	license: "MIT",
+	dims: 384,
 };
 
 const APP_DIR = "indexa";

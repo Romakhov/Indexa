@@ -115,6 +115,12 @@ export class IndexaSettingTab extends PluginSettingTab {
 						control: { type: "slider", key: "semanticThreshold", min: 0, max: 100, step: 5 },
 					},
 					{ name: "Top-K neighbours", visible: advanced, control: { type: "number", key: "topK", min: 5, max: 50 } },
+					{
+						name: "Embedding workers",
+						desc: "Parallel model copies used during analysis. More is faster on multi-core CPUs but each uses ~300 MB of memory.",
+						visible: advanced,
+						control: { type: "slider", key: "embeddingWorkers", min: 1, max: 4, step: 1 },
+					},
 					{ name: "Debug logging", visible: advanced, control: { type: "toggle", key: "debugLogging" } },
 				],
 			},

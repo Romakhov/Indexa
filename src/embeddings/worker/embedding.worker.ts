@@ -35,8 +35,15 @@ const guardedFetch = async (input: RequestInfo | URL): Promise<Response> => {
 	const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
 	const path = url.startsWith(LOCAL_ROOT) ? url : new URL(url, "http://local").pathname;
 	if (url.startsWith(LOCAL_ROOT) && path.startsWith(modelRoot)) {
-		const buf = modelFiles.get(path.slice(modelRoot.length));
-		if (buf) return new Response(buf.slice(0), { status: 200 });
+		const name = path.slice(modelRoot.length);
+		const buf = modelFiles.get(name);
+		if (buf) {
+			// config/tokenizer files may be read more than once; the large ONNX
+			// weights are read once, so hand them over without a copy
+			if (!name.endsWith(".onnx")) return new Response(buf.slice(0), { status: 200 });
+			modelFiles.delete(name);
+			return new Response(buf, { status: 200 });
+		}
 		post({ type: "log", message: `model file not provided: ${path}` });
 		return new Response(null, { status: 404, statusText: "Not Found" });
 	}
@@ -54,13 +61,13 @@ const guardedFetch = async (input: RequestInfo | URL): Promise<Response> => {
 
 // transformers.js is loaded lazily in init(), i.e. strictly after the guard
 // above is installed. The wasm import below is just embedded bytes.
-import wasmBinary from "onnxruntime-web/ort-wasm-simd-threaded.wasm";
+import wasmBinary from "indexa-ort-wasm";
 
 type Extractor = (texts: string[], opts: Record<string, unknown>) => Promise<{ data: Float32Array; dims: number[] }>;
 let extractor: (Extractor & { dispose?: () => Promise<void> }) | null = null;
 let dimensions = 0;
 
-async function init(modelId: string, dtype: string, files: Record<string, ArrayBuffer>) {
+async function init(modelId: string, dtype: string, files: Record<string, ArrayBuffer>, device: "wasm" | "webgpu") {
 	const t0 = performance.now();
 	modelFiles = new Map(Object.entries(files));
 	modelRoot = `${LOCAL_ROOT}${modelId}/`;
@@ -79,16 +86,17 @@ async function init(modelId: string, dtype: string, files: Record<string, ArrayB
 	// transformers.js shallow-copies the ORT env into env.backends.onnx and the
 	// `wasm` section is lost, so configure ORT's own env. The build aliases
 	// transformers' "onnxruntime-web/webgpu" import to this same module.
-	const ort = await import("onnxruntime-web/wasm");
+	const ort = await import("indexa-ort");
 	ort.env.wasm.wasmBinary = wasmBinary;
 	ort.env.wasm.wasmPaths = undefined; // drop transformers' CDN default; glue is inlined in the bundle
 	ort.env.wasm.numThreads = 1; // Obsidian is not cross-origin isolated: no SharedArrayBuffer
 	ort.env.wasm.proxy = false;
 
-	extractor = (await pipeline("feature-extraction", modelId, { device: "wasm", dtype: dtype as any })) as any;
+	extractor = (await pipeline("feature-extraction", modelId, { device, dtype: dtype as any })) as any;
+	modelFiles.clear(); // the session holds its own copy now
 	const probe = await extractor!(["probe"], { pooling: "mean", normalize: true });
 	dimensions = probe.dims[probe.dims.length - 1];
-	return { loadMs: performance.now() - t0, backend: "wasm-cpu" };
+	return { loadMs: performance.now() - t0, backend: device === "webgpu" ? "webgpu" : "wasm-cpu" };
 }
 
 async function embed(texts: string[]): Promise<Float32Array[]> {
@@ -105,7 +113,7 @@ ctx.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
 	const req = ev.data;
 	try {
 		if (req.type === "init") {
-			const { loadMs, backend } = await init(req.modelId, req.dtype, req.files);
+			const { loadMs, backend } = await init(req.modelId, req.dtype, req.files, req.device);
 			post({ type: "init", id: req.id, dimensions, loadMs, backend });
 		} else if (req.type === "embed") {
 			const t0 = performance.now();

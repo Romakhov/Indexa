@@ -2,7 +2,10 @@ import { debounce, Notice, Plugin, TFile } from "obsidian";
 import { AnalysisCancelled, AnalysisRunner, type AnalysisSummary } from "./core/AnalysisRunner";
 import { NoteIdRegistry } from "./core/NoteIdRegistry";
 import { ObsidianVaultScanner } from "./core/VaultScanner";
+import { EmbeddingCache } from "./embeddings/EmbeddingCache";
 import { LocalEmbeddingProvider } from "./embeddings/LocalEmbeddingProvider";
+import { PooledEmbeddingProvider } from "./embeddings/PooledEmbeddingProvider";
+import { AdapterBinaryStore } from "./storage/BinaryStore";
 import { E5_SMALL, ModelStore } from "./embeddings/ModelStore";
 import { normalizeSettings, type IndexaSettings } from "./settings/Settings";
 import { registerSpikeCommands } from "./spike/registerSpikeCommands";
@@ -11,6 +14,8 @@ import { IndexaSettingTab } from "./ui/SettingsTab";
 
 
 const NOTE_IDS_FILE = "note-ids.json";
+/** Free the model's memory after this long without semantic work. */
+const MODEL_IDLE_MS = 5 * 60_000;
 
 export default class IndexaPlugin extends Plugin {
 	declare settings: IndexaSettings;
@@ -20,6 +25,9 @@ export default class IndexaPlugin extends Plugin {
 
 	private noteIds = new NoteIdRegistry();
 	private provider: LocalEmbeddingProvider | null = null;
+	private pool: PooledEmbeddingProvider | null = null;
+	private poolIdleTimer: number | null = null;
+	private cache: EmbeddingCache | null = null;
 	private analysis: AbortController | null = null;
 	private readonly saveNoteIdsSoon = debounce(() => void this.saveNoteIds(), 2000, true);
 
@@ -47,6 +55,7 @@ export default class IndexaPlugin extends Plugin {
 		this.analysis?.abort();
 		await this.saveNoteIds();
 		await this.provider?.dispose();
+		await this.disposePool();
 	}
 
 	private async onLayoutReady() {
@@ -140,8 +149,12 @@ export default class IndexaPlugin extends Plugin {
 			excludedTags: this.settings.excludedTags,
 			configDir: this.app.vault.configDir,
 		}));
+		const embedding = this.isModelInstalled()
+			? { provider: this.getPool(), cache: this.getCache(), parallel: this.settings.embeddingWorkers }
+			: undefined;
+		if (!embedding) new Notice("Local semantic model is not installed: only text preparation will run.");
 		try {
-			const result = await new AnalysisRunner(scanner).run((p) => this.views().forEach((v) => v.setProgress(p)), controller.signal);
+			const result = await new AnalysisRunner(scanner, embedding).run((p) => this.views().forEach((v) => v.setProgress(p)), controller.signal);
 			this.lastSummary = result.summary;
 			await this.saveNoteIds();
 		} catch (e) {
@@ -151,6 +164,7 @@ export default class IndexaPlugin extends Plugin {
 				new Notice(`Analysis failed: ${e instanceof Error ? e.message : e}`);
 			}
 		} finally {
+			this.schedulePoolDisposal();
 			this.analysis = null;
 			this.views().forEach((v) => v.setProgress(null));
 		}
@@ -166,6 +180,42 @@ export default class IndexaPlugin extends Plugin {
 	getProvider(): LocalEmbeddingProvider {
 		this.provider ??= new LocalEmbeddingProvider(this.modelStore, E5_SMALL);
 		return this.provider;
+	}
+
+	/** Worker pool for bulk analysis; recreated if the worker count setting changed. */
+	getPool(): PooledEmbeddingProvider {
+		if (this.poolIdleTimer !== null) window.clearTimeout(this.poolIdleTimer);
+		this.poolIdleTimer = null;
+		if (this.pool && this.pool.size !== this.settings.embeddingWorkers) {
+			void this.pool.dispose();
+			this.pool = null;
+		}
+		this.pool ??= new PooledEmbeddingProvider(this.modelStore, E5_SMALL, this.settings.embeddingWorkers);
+		return this.pool;
+	}
+
+	private schedulePoolDisposal() {
+		if (!this.pool) return;
+		if (this.poolIdleTimer !== null) window.clearTimeout(this.poolIdleTimer);
+		this.poolIdleTimer = window.setTimeout(() => void this.disposePool(), MODEL_IDLE_MS);
+	}
+
+	private async disposePool() {
+		if (this.poolIdleTimer !== null) window.clearTimeout(this.poolIdleTimer);
+		this.poolIdleTimer = null;
+		const p = this.pool;
+		this.pool = null;
+		await p?.dispose();
+	}
+
+	getCache(): EmbeddingCache {
+		this.cache ??= new EmbeddingCache(
+			new AdapterBinaryStore(this.app.vault.adapter, `${this.manifest.dir}/cache`),
+			E5_SMALL.id,
+			`${E5_SMALL.revision}:${E5_SMALL.dtype}`,
+			E5_SMALL.dims,
+		);
+		return this.cache;
 	}
 
 	isModelInstalled() {

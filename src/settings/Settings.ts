@@ -31,6 +31,8 @@ export interface IndexaSettings {
 	/** 0–100, relative (rank-based), not a raw cosine value. */
 	semanticThreshold: number;
 	topK: number;
+	/** parallel embedding workers; each holds its own model copy (~300 MB RAM) */
+	embeddingWorkers: number;
 	debugLogging: boolean;
 }
 
@@ -53,6 +55,7 @@ export const DEFAULT_SETTINGS: IndexaSettings = {
 	showAdvanced: false,
 	semanticThreshold: 50,
 	topK: 15,
+	embeddingWorkers: 2,
 	debugLogging: false,
 };
 
@@ -79,5 +82,6 @@ export function normalizeSettings(raw: unknown): IndexaSettings {
 		maxIndexesPerNote: clamp(s.maxIndexesPerNote, 1, 10, DEFAULT_SETTINGS.maxIndexesPerNote),
 		semanticThreshold: clamp(s.semanticThreshold, 0, 100, DEFAULT_SETTINGS.semanticThreshold),
 		topK: clamp(s.topK, 5, 50, DEFAULT_SETTINGS.topK),
+		embeddingWorkers: Math.round(clamp(s.embeddingWorkers, 1, 4, DEFAULT_SETTINGS.embeddingWorkers)),
 	};
 }

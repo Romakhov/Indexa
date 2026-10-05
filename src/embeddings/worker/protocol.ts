@@ -5,6 +5,7 @@ export interface InitRequest {
 	id: number;
 	modelId: string;
 	dtype: string;
+	device: "wasm" | "webgpu";
 	/** Model files keyed by path relative to the model root, e.g. "onnx/model_quantized.onnx". */
 	files: Record<string, ArrayBuffer>;
 }

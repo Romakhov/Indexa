@@ -20,6 +20,11 @@ export interface NoteDocument {
 export interface ProcessedNote {
 	noteId: string;
 	text: string;
+	/**
+	 * Title, aliases, headings and tags only. Used as the head text of notes
+	 * that also get chunk vectors (their body is covered by the chunks).
+	 */
+	headerText: string;
 	/** Characters of meaningful body text after cleanup and template removal. */
 	semanticChars: number;
 	/**

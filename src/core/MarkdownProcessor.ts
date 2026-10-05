@@ -33,6 +33,7 @@ export interface ProcessorOptions {
 	maxHeadings: number;
 }
 
+
 const DEFAULTS: ProcessorOptions = { maxChars: 2000, maxHeadings: 10 };
 
 /** Cleans Markdown down to plain prose, one non-empty line per line. */
@@ -89,6 +90,7 @@ export function processNote(
 	return {
 		noteId: doc.id,
 		text: [...header, body].filter(Boolean).join("\n").slice(0, opts.maxChars),
+		headerText: header.join("\n").slice(0, opts.maxChars),
 		semanticChars,
 		lowContent: semanticChars < LOW_CONTENT_CHARS,
 	};

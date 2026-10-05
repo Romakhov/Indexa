@@ -3,7 +3,11 @@
 // the remaining stages. Never mutates the vault.
 
 import type { NoteDocument, ProcessedNote } from "../types/NoteDocument";
+import type { EmbeddingCache } from "../embeddings/EmbeddingCache";
+import type { EmbeddingProvider } from "../embeddings/EmbeddingProvider";
+import { EmbeddingCancelled, embedNotes, type NoteToEmbed } from "../embeddings/NoteEmbedder";
 import { bodyLines, processNote } from "./MarkdownProcessor";
+import { chunkNote, type Chunk } from "./SemanticChunker";
 import { detectTemplateLines } from "./TemplateDetector";
 import type { ObsidianVaultScanner, ScanResult } from "./VaultScanner";
 import { timeSlicer } from "./yieldToUi";
@@ -28,12 +32,27 @@ export interface AnalysisSummary {
 	templateLines: number;
 	errors: { path: string; message: string }[];
 	durationMs: number;
+	embedding?: {
+		embedded: number;
+		fromCache: number;
+		notesWithChunks: number;
+		chunks: number;
+		ms: number;
+	};
+}
+
+export interface EmbeddingDeps {
+	provider: EmbeddingProvider;
+	cache: EmbeddingCache;
+	/** batches in flight (= worker pool size) */
+	parallel: number;
 }
 
 export interface AnalysisResult {
 	summary: AnalysisSummary;
 	notes: NoteDocument[];
 	processed: ProcessedNote[];
+	chunks: Map<string, Chunk[]>;
 }
 
 export class AnalysisCancelled extends Error {
@@ -43,7 +62,11 @@ export class AnalysisCancelled extends Error {
 }
 
 export class AnalysisRunner {
-	constructor(private readonly scanner: ObsidianVaultScanner) {}
+	/** @param embedding omit to stop after text preparation (e.g. model not installed) */
+	constructor(
+		private readonly scanner: ObsidianVaultScanner,
+		private readonly embedding?: EmbeddingDeps,
+	) {}
 
 	async run(onProgress: (p: Progress) => void, signal: AbortSignal): Promise<AnalysisResult> {
 		const t0 = performance.now();
@@ -94,10 +117,55 @@ export class AnalysisRunner {
 		}
 		report("Processing", scan.notes.length, scan.notes.length);
 
+		const chunks = new Map<string, Chunk[]>();
+		let embeddingSummary: AnalysisSummary["embedding"];
+		if (this.embedding) {
+			const { provider, cache, parallel } = this.embedding;
+			const toEmbed: NoteToEmbed[] = [];
+			for (let i = 0; i < notes.length; i++) {
+				let c: Chunk[] = [];
+				try {
+					c = chunkNote(notes[i], templates);
+				} catch (e) {
+					errors.push({ path: notes[i].path, message: `chunking: ${e instanceof Error ? e.message : e}` });
+				}
+				chunks.set(processed[i].noteId, c);
+				toEmbed.push({ processed: processed[i], chunks: c });
+				await maybeYield();
+			}
+			check();
+			const te = performance.now();
+			report("Embedding", 0, toEmbed.length);
+			await cache.load();
+			try {
+				const res = await embedNotes(toEmbed, provider, cache, {
+					parallel,
+					signal,
+					onProgress: (p) => report("Embedding", p.done, p.total),
+					onCheckpoint: () => cache.save(),
+				});
+				cache.retainOnly(processed.map((p) => p.noteId));
+				embeddingSummary = {
+					...res,
+					notesWithChunks: toEmbed.filter((n) => n.chunks.length).length,
+					chunks: toEmbed.reduce((n, x) => n + x.chunks.length, 0),
+					ms: Math.round(performance.now() - te),
+				};
+			} catch (e) {
+				if (e instanceof EmbeddingCancelled || signal.aborted) throw new AnalysisCancelled();
+				throw e;
+			} finally {
+				// finished notes survive a cancel or an error (spec §67)
+				await cache.save();
+			}
+		}
+
 		return {
 			notes,
 			processed,
+			chunks,
 			summary: {
+				embedding: embeddingSummary,
 				finishedAt: Date.now(),
 				totalFiles: scan.total,
 				analysable: processed.length,
