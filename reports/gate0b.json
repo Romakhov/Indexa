@@ -1,0 +1,230 @@
+{
+  "gate": "0b",
+  "passed": true,
+  "checks": {
+    "hnswRecall": true,
+    "persistReload": true,
+    "incrementalOps": true,
+    "graphSparse": true,
+    "louvainDeterministic": true,
+    "louvainStableAcrossSeeds": true,
+    "scaleSparse": true,
+    "uiResponsive": true,
+    "noNetwork": true
+  },
+  "mainThreadLongTasks": {
+    "worstMs": 192,
+    "totalMs": 624,
+    "count": 6,
+    "entries": [
+      {
+        "start": 689202,
+        "duration": 78,
+        "stage": "500:persistMs"
+      },
+      {
+        "start": 691777,
+        "duration": 72,
+        "stage": "1990:persistMs"
+      },
+      {
+        "start": 691849,
+        "duration": 192,
+        "stage": "1990:graphMs"
+      },
+      {
+        "start": 692355,
+        "duration": 55,
+        "stage": "other"
+      },
+      {
+        "start": 700861,
+        "duration": 74,
+        "stage": "other"
+      },
+      {
+        "start": 701195,
+        "duration": 153,
+        "stage": "other"
+      }
+    ]
+  },
+  "blockedRequests": [],
+  "memory": {
+    "usedJSHeapMB": 1041
+  },
+  "results": [
+    {
+      "notes": 100,
+      "newlyEmbedded": 0,
+      "embedPerSec": null,
+      "timingsMs": {
+        "readMs": 23,
+        "embedMs": 0,
+        "hnswBuildMs": 34,
+        "knnMs": 6,
+        "recallMs": 24,
+        "persistMs": 21,
+        "graphMs": 5,
+        "louvain3xMs": 7
+      },
+      "knnLatencyMs": 0.06,
+      "hnsw": {
+        "recallAtK": 1,
+        "k": 15,
+        "persistedBytes": 153600,
+        "reloadMs": 7,
+        "persistReloadEqual": true,
+        "removeWorks": true,
+        "reAddWorks": true
+      },
+      "graph": {
+        "nodes": 100,
+        "edges": 953,
+        "avgDegree": 19.1,
+        "fullPairwiseEdges": 4950
+      },
+      "louvain": {
+        "communities": 5,
+        "modularity": 0.4842,
+        "sizesTop10": [
+          26,
+          26,
+          20,
+          18,
+          10
+        ],
+        "deterministicSameSeed": true,
+        "seedStabilityNmi": 1
+      },
+      "qualityVsTopics": {
+        "nmiRescaled": 0.4822,
+        "purityRescaled": 0.47,
+        "nmiRawWeights": 0.2533,
+        "communitiesRawWeights": 3
+      }
+    },
+    {
+      "notes": 500,
+      "newlyEmbedded": 0,
+      "embedPerSec": null,
+      "timingsMs": {
+        "readMs": 95,
+        "embedMs": 0,
+        "hnswBuildMs": 87,
+        "knnMs": 52,
+        "recallMs": 87,
+        "persistMs": 107,
+        "graphMs": 15,
+        "louvain3xMs": 13
+      },
+      "knnLatencyMs": 0.104,
+      "hnsw": {
+        "recallAtK": 0.9993,
+        "k": 15,
+        "persistedBytes": 768000,
+        "reloadMs": 85,
+        "persistReloadEqual": true,
+        "removeWorks": true,
+        "reAddWorks": true
+      },
+      "graph": {
+        "nodes": 500,
+        "edges": 5145,
+        "avgDegree": 20.6,
+        "fullPairwiseEdges": 124750
+      },
+      "louvain": {
+        "communities": 8,
+        "modularity": 0.7167,
+        "sizesTop10": [
+          108,
+          84,
+          69,
+          67,
+          61,
+          48,
+          35,
+          28
+        ],
+        "deterministicSameSeed": true,
+        "seedStabilityNmi": 0.9691
+      },
+      "qualityVsTopics": {
+        "nmiRescaled": 0.5637,
+        "purityRescaled": 0.534,
+        "nmiRawWeights": 0.5653,
+        "communitiesRawWeights": 8
+      }
+    },
+    {
+      "notes": 1990,
+      "newlyEmbedded": 0,
+      "embedPerSec": null,
+      "timingsMs": {
+        "readMs": 361,
+        "embedMs": 2,
+        "hnswBuildMs": 723,
+        "knnMs": 316,
+        "recallMs": 376,
+        "persistMs": 759,
+        "graphMs": 71,
+        "louvain3xMs": 36
+      },
+      "knnLatencyMs": 0.159,
+      "hnsw": {
+        "recallAtK": 0.9987,
+        "k": 15,
+        "persistedBytes": 3056640,
+        "reloadMs": 721,
+        "persistReloadEqual": true,
+        "removeWorks": true,
+        "reAddWorks": true
+      },
+      "graph": {
+        "nodes": 1990,
+        "edges": 21690,
+        "avgDegree": 21.8,
+        "fullPairwiseEdges": 1979055
+      },
+      "louvain": {
+        "communities": 13,
+        "modularity": 0.8175,
+        "sizesTop10": [
+          364,
+          214,
+          174,
+          132,
+          130,
+          130,
+          129,
+          128,
+          128,
+          127
+        ],
+        "deterministicSameSeed": true,
+        "seedStabilityNmi": 0.9644
+      },
+      "qualityVsTopics": {
+        "nmiRescaled": 0.6827,
+        "purityRescaled": 0.7704,
+        "nmiRawWeights": 0.6754,
+        "communitiesRawWeights": 12
+      }
+    }
+  ],
+  "scale": {
+    "vectors": 10000,
+    "timingsMs": {
+      "hnswBuildMs": 5902,
+      "knnMs": 2607,
+      "graphMs": 326,
+      "louvainMs": 104,
+      "saveMs": 36,
+      "reloadMs": 5930
+    },
+    "edges": 107885,
+    "fullPairwiseEdges": 49995000,
+    "communities": 18
+  }
+}

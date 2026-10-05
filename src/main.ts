@@ -2,6 +2,8 @@ import { Notice, Plugin } from "obsidian";
 import { LocalEmbeddingProvider } from "./embeddings/LocalEmbeddingProvider";
 import { E5_SMALL, ModelStore } from "./embeddings/ModelStore";
 import { runGate0a } from "./spike/gate0a";
+import { runGate0b } from "./spike/gate0b";
+import { AdapterBinaryStore } from "./storage/BinaryStore";
 
 export default class IndexaPlugin extends Plugin {
 	onloadMs = 0;
@@ -24,7 +26,29 @@ export default class IndexaPlugin extends Plugin {
 			callback: () => this.runGate0a(),
 		});
 
+		this.addCommand({
+			id: "spike-gate-0b",
+			name: "Spike: run Gate 0b pipeline benchmark",
+			callback: () => this.runGate0b(),
+		});
+
 		this.onloadMs = performance.now() - t0;
+	}
+
+	async runGate0b(sizes?: number[]) {
+		new Notice("Gate 0b: running…");
+		const store = new AdapterBinaryStore(this.app.vault.adapter, `${this.manifest.dir}/spike-data`);
+		const report = await runGate0b(this.app, this.getProvider(), store, sizes);
+		await this.writeReport("gate0b.json", report);
+		new Notice(`Gate 0b: ${report.passed ? "PASSED" : "FAILED"} (see console)`);
+		return report;
+	}
+
+	private async writeReport(name: string, report: unknown) {
+		const dir = `${this.manifest.dir}/reports`;
+		if (!(await this.app.vault.adapter.exists(dir))) await this.app.vault.adapter.mkdir(dir);
+		await this.app.vault.adapter.write(`${dir}/${name}`, JSON.stringify(report, null, 2));
+		console.log(`[indexa] ${name}`, report);
 	}
 
 	async onunload() {

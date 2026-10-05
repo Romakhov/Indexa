@@ -5,3 +5,4 @@ main.js
 dev-vault/.obsidian/plugins/indexa/
 dev-vault/.obsidian/workspace*.json
 reports/*.local.json
+dev-vault/corpus/

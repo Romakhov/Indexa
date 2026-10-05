@@ -15,11 +15,15 @@
   "devDependencies": {
     "@types/node": "^26.6.4",
     "esbuild": "^0.28.2",
+    "graphology-types": "^0.24.8",
     "obsidian": "^1.13.1",
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.3.0"
+    "@huggingface/transformers": "^4.3.0",
+    "graphology": "^0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
+    "hnswlib-wasm-core": "^0.9.1"
   },
   "private": true
 }
