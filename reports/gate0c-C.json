@@ -1,0 +1,132 @@
+{
+  "gate": "0c",
+  "variant": {
+    "variant": "C — детальнее",
+    "excludePrefixes": [
+      "Zettelkasten/Cinema/"
+    ],
+    "stripTemplates": true,
+    "refineMaxShare": 0.05,
+    "refineMinSize": 10,
+    "resolutions": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "seeded": true
+  },
+  "templateLines": 8,
+  "refinedSplits": 11,
+  "seeded": {
+    "loo": {
+      "centroid": {
+        "top1": 0.574,
+        "top3": 0.783,
+        "top1Frequent": 0.622,
+        "evaluated": 263,
+        "evaluatedFrequent": 233
+      },
+      "centroidPlusTitle": {
+        "top1": 0.605,
+        "top3": 0.798,
+        "top1Frequent": 0.665,
+        "evaluated": 263,
+        "evaluatedFrequent": 233
+      },
+      "knnVote": {
+        "top1": 0.506,
+        "top3": 0.715,
+        "top1Frequent": 0.558,
+        "evaluated": 263,
+        "evaluatedFrequent": 233
+      }
+    },
+    "indexes": 46,
+    "unlabeled": 89,
+    "confidentProposals": 4,
+    "marginThreshold": 0.02,
+    "reportNote": "Indexa/Gate 0c — C — по вашим индексам.md"
+  },
+  "notes": 352,
+  "shortNotes": 5,
+  "labeledNotes": 263,
+  "manualIndexes": 43,
+  "newlyEmbedded": 0,
+  "timingsMs": {
+    "scanMs": 46,
+    "embedMs": 1165,
+    "graphMs": 88,
+    "clusterMs": 31,
+    "seededMs": 669,
+    "reportMs": 47
+  },
+  "graph": {
+    "edges": 4212,
+    "k": 15
+  },
+  "sweep": [
+    {
+      "resolution": 1,
+      "communities": 6,
+      "atLeast3": 6,
+      "largest": 109,
+      "largestShare": 0.31,
+      "modularity": 0.441,
+      "nmiVsManual": 0.407,
+      "purityVsManual": 0.228
+    },
+    {
+      "resolution": 2,
+      "communities": 13,
+      "atLeast3": 13,
+      "largest": 45,
+      "largestShare": 0.128,
+      "modularity": 0.308,
+      "nmiVsManual": 0.559,
+      "purityVsManual": 0.395
+    },
+    {
+      "resolution": 3,
+      "communities": 22,
+      "atLeast3": 22,
+      "largest": 33,
+      "largestShare": 0.094,
+      "modularity": 0.239,
+      "nmiVsManual": 0.627,
+      "purityVsManual": 0.49
+    },
+    {
+      "resolution": 4,
+      "communities": 33,
+      "atLeast3": 30,
+      "largest": 23,
+      "largestShare": 0.065,
+      "modularity": 0.184,
+      "nmiVsManual": 0.672,
+      "purityVsManual": 0.529
+    },
+    {
+      "resolution": 6,
+      "communities": 51,
+      "atLeast3": 40,
+      "largest": 21,
+      "largestShare": 0.06,
+      "modularity": 0.11,
+      "nmiVsManual": 0.7,
+      "purityVsManual": 0.567
+    },
+    {
+      "resolution": "1 + refine",
+      "communities": 32,
+      "atLeast3": 32,
+      "largest": 17,
+      "largestShare": 0.048,
+      "modularity": null,
+      "nmiVsManual": 0.653,
+      "purityVsManual": 0.51
+    }
+  ],
+  "reportNote": "Indexa/Gate 0c — C — детальнее.md"
+}

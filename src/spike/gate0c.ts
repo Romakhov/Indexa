@@ -19,6 +19,7 @@ import { HnswVectorIndex } from "../vectors/HnswVectorIndex";
 import type { VectorSearchResult } from "../vectors/VectorIndex";
 import { SpikeEmbeddingCache } from "./gate0b";
 import { nmi, purity } from "./metrics";
+import { seededEvaluation, type SeedItem } from "./seeded";
 
 const EXCLUDED_FOLDERS = ["Templates/", "Indexes/", "Indexa/"];
 export interface Gate0cOptions {
@@ -29,9 +30,13 @@ export interface Gate0cOptions {
 	stripTemplates: boolean;
 	/** recursive refinement of too-broad communities (spec §45–46); null = off */
 	refineMaxShare: number | null;
+	refineMinSize: number;
+	resolutions: number[];
+	/** evaluate classification against the user's existing indexes (seeded mode) */
+	seeded: boolean;
 }
 
-const DEFAULT_OPTS: Gate0cOptions = { variant: "raw", excludePrefixes: [], stripTemplates: false, refineMaxShare: null };
+const DEFAULT_OPTS: Gate0cOptions = { variant: "raw", excludePrefixes: [], stripTemplates: false, refineMaxShare: null, refineMinSize: 30, resolutions: [0.5, 0.75, 1, 1.5, 2], seeded: false };
 
 /**
  * Removes lines that occur in many notes. Lines are compared after
@@ -54,7 +59,6 @@ function stripTemplateLines(rows: NoteRow[]): number {
 	return template.size;
 }
 
-const RESOLUTIONS = [0.5, 0.75, 1, 1.5, 2];
 const PRIMARY_RESOLUTION = 1;
 
 const STOPWORDS = new Set(
@@ -219,7 +223,7 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 	const goldLabels = labeled.map(([r]) => r.gold!);
 	const sweep: Record<string, unknown>[] = [];
 	let primary: ClusterResult | null = null;
-	for (const resolution of RESOLUTIONS) {
+	for (const resolution of opts.resolutions) {
 		const res = await engine.cluster(graph, { resolution, seed: 1 });
 		if (resolution === PRIMARY_RESOLUTION) primary = res;
 		const part = labeled.map(([, i]) => res.communities.get(ids[i])!);
@@ -238,7 +242,7 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 	}
 	let refinedSplits = 0;
 	if (opts.refineMaxShare !== null) {
-		const refined = await refineCommunities(graph, primary!, engine, { resolution: PRIMARY_RESOLUTION, seed: 1 }, { maxShare: opts.refineMaxShare, minSizeToSplit: 30, maxDepth: 2 });
+		const refined = await refineCommunities(graph, primary!, engine, { resolution: PRIMARY_RESOLUTION, seed: 1 }, { maxShare: opts.refineMaxShare, minSizeToSplit: opts.refineMinSize, maxDepth: 3 });
 		refinedSplits = refined.splits;
 		primary = refined;
 		const part = labeled.map(([, i]) => refined.communities.get(ids[i])!);
@@ -256,6 +260,9 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 		});
 	}
 	lap("clusterMs");
+
+	const seeded = opts.seeded ? await seededReport(app, provider, rows, vectors, opts.variant) : null;
+	lap("seededMs");
 
 	// 5. report note
 	const comm = primary!.communities;
@@ -317,6 +324,7 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 		variant: opts,
 		templateLines,
 		refinedSplits,
+		seeded,
 		notes: rows.length,
 		shortNotes: rows.filter((r) => r.short).length,
 		labeledNotes: labeled.length,
@@ -326,5 +334,70 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 		graph: { edges: graph.size, k: K },
 		sweep,
 		reportNote: REPORT_PATH,
+	};
+}
+
+async function seededReport(app: App, provider: LocalEmbeddingProvider, rows: NoteRow[], vectors: Float32Array[], variant: string) {
+	// index names: the user's labels plus every note in Indexes/
+	const indexNotes = app.vault.getMarkdownFiles().filter((f) => f.path.startsWith("Indexes/"));
+	const names = [...new Set([...rows.filter((r) => r.gold).map((r) => r.gold!), ...indexNotes.map((f) => f.basename)])];
+	const titleVecs = await provider.embedBatch(names);
+	const titleVectors = new Map(names.map((n, i) => [n, titleVecs[i]]));
+	const items: SeedItem[] = rows.map((r, i) => ({ id: r.file.path, gold: r.gold, vector: vectors[i] }));
+	const ev = seededEvaluation(items, titleVectors, provider.dimensions);
+	const byPath = new Map(rows.map((r) => [r.file.path, r.file]));
+
+	const MARGIN = 0.02;
+	const confident = ev.proposals.filter((p) => p.margin >= MARGIN);
+	const byIndex = new Map<string, typeof ev.proposals>();
+	for (const p of ev.proposals) byIndex.set(p.best.label, [...(byIndex.get(p.best.label) ?? []), p]);
+
+	const pct = (x: number) => Math.round(x * 100) + "%";
+	const lines = [
+		"---",
+		"indexa-report: gate-0c-seeded",
+		"---",
+		"# Indexa — Gate 0c: классификация по вашим индексам (" + variant + ")",
+		"",
+		"Каждый ваш индекс превращён в «центр смысла»: среднее векторов его заметок + вектор названия индекса. LLM не используется.",
+		"",
+		"## Насколько точно угадывается ваш индекс (leave-one-out)",
+		"",
+		"Для каждой из " + ev.loo.centroid.evaluated + " размеченных заметок индекс «забывается» и предсказывается по остальным.",
+		"",
+		"| способ | угадан с 1-й попытки | в тройке лучших | 1-я попытка, индексы с ≥4 заметками |",
+		"|---|---|---|---|",
+		...Object.entries(ev.loo).map(([k, v]) => "| " + k + " | " + pct(v.top1) + " | " + pct(v.top3) + " | " + pct(v.top1Frequent) + " (" + v.evaluatedFrequent + ") |"),
+		"",
+		"## Предложения для неразмеченных заметок",
+		"",
+		"Неразмеченных: " + ev.proposals.length + ". Уверенных предложений (отрыв от второго варианта ≥ " + MARGIN + "): " + confident.length + ".",
+		"",
+	];
+	const order = [...ev.labels].sort((a, b) => (ev.counts.get(b) ?? 0) - (ev.counts.get(a) ?? 0));
+	for (const label of order) {
+		const stat = ev.perIndex.get(label);
+		const props = (byIndex.get(label) ?? []).sort((a, b) => b.best.score - a.best.score);
+		lines.push("### " + label);
+		lines.push("");
+		lines.push("- Ваших заметок: " + (ev.counts.get(label) ?? 0) + (stat ? "; угадывается: " + stat.hit + " из " + stat.n : ""));
+		const conf = props.filter((p) => p.margin >= MARGIN).slice(0, 12);
+		const weak = props.filter((p) => p.margin < MARGIN).slice(0, 6);
+		if (conf.length) lines.push("- **Предлагается добавить:** " + conf.map((p) => "[[" + p.id.replace(/\.md$/, "") + "|" + byPath.get(p.id)!.basename + "]] (" + p.best.score.toFixed(2) + ")").join(", "));
+		if (weak.length) lines.push("- Сомнительно (близко ко второму: " + weak.map((p) => p.second?.label).filter(Boolean).slice(0, 3).join(", ") + "): " + weak.map((p) => "[[" + p.id.replace(/\.md$/, "") + "|" + byPath.get(p.id)!.basename + "]]").join(", "));
+		lines.push("");
+	}
+	const path = "Indexa/Gate 0c — C — по вашим индексам.md";
+	const existing = app.vault.getFileByPath(path);
+	if (existing) await app.vault.modify(existing, lines.join("\n"));
+	else await app.vault.create(path, lines.join("\n"));
+
+	return {
+		loo: ev.loo,
+		indexes: ev.labels.length,
+		unlabeled: ev.proposals.length,
+		confidentProposals: confident.length,
+		marginThreshold: MARGIN,
+		reportNote: path,
 	};
 }
