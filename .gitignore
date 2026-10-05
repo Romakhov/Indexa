@@ -2,6 +2,6 @@ node_modules/
 build/
 main.js
 *.log
-dev-vault/.obsidian/plugins/structure-tree/
+dev-vault/.obsidian/plugins/indexa/
 dev-vault/.obsidian/workspace*.json
 reports/*.local.json

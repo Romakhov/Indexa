@@ -40,7 +40,7 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 		const files = await this.store.readAll(this.spec);
 
 		this.workerUrl = URL.createObjectURL(new Blob([__WORKER_CODE__], { type: "text/javascript" }));
-		this.worker = new Worker(this.workerUrl, { name: "structure-tree-embeddings" });
+		this.worker = new Worker(this.workerUrl, { name: "indexa-embeddings" });
 		this.worker.onmessage = (ev: MessageEvent<WorkerResponse>) => this.onMessage(ev.data);
 		this.worker.onerror = (ev) => this.failAll(new Error(`Embedding worker crashed: ${ev.message}`));
 
@@ -85,11 +85,11 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 	private onMessage(msg: WorkerResponse) {
 		if (msg.type === "blocked") {
 			this.blockedRequests.push(msg.url);
-			console.warn("[structure-tree] blocked network request from embedding worker:", msg.url);
+			console.warn("[indexa] blocked network request from embedding worker:", msg.url);
 			return;
 		}
 		if (msg.type === "log") {
-			console.debug("[structure-tree] worker:", msg.message);
+			console.debug("[indexa] worker:", msg.message);
 			return;
 		}
 		const p = this.pending.get(msg.id);

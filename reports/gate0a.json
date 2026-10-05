@@ -1,19 +1,19 @@
 {
   "gate": "0a",
-  "passed": true,
+  "passed": false,
   "checks": {
     "modelInitialized": true,
     "ruSemantic": true,
     "enSemantic": true,
     "crossLingual": true,
     "batchConsistent": true,
-    "uiResponsive": true,
+    "uiResponsive": false,
     "noNetwork": true
   },
   "dimensions": 384,
   "backend": "wasm-cpu",
-  "modelLoadMs": 762,
-  "initWallMs": 1118,
+  "modelLoadMs": 990,
+  "initWallMs": 1404,
   "similarities": {
     "ru:A~B": 0.8797,
     "ru:A~C": 0.7892,
@@ -24,15 +24,15 @@
   },
   "throughput": {
     "texts": 64,
-    "ms": 1750,
-    "textsPerSec": 36.6
+    "ms": 1756,
+    "textsPerSec": 36.4
   },
   "singleVsBatch": 0.997152,
-  "worstMainThreadStallMs": 66,
+  "worstMainThreadStallMs": 1009,
   "blockedRequests": [],
   "memory": {
-    "usedJSHeapMB": 247
+    "usedJSHeapMB": 146
   },
-  "pluginOnloadMs": 0,
-  "modelDir": "C:\\Users\\kdrom\\AppData\\Roaming\\obsidian-structure-tree\\models\\Xenova\\multilingual-e5-small\\761b726dd34fb83930e26aab4e9ac3899aa1fa78"
+  "pluginOnloadMs": 8.6,
+  "modelDir": "C:\\Users\\kdrom\\AppData\\Roaming\\indexa\\models\\Xenova\\multilingual-e5-small\\761b726dd34fb83930e26aab4e9ac3899aa1fa78"
 }

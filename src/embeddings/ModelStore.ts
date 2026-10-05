@@ -27,7 +27,7 @@ export const E5_SMALL: ModelSpec = {
 	license: "MIT",
 };
 
-const APP_DIR = "obsidian-structure-tree";
+const APP_DIR = "indexa";
 
 export function appDataDir(): string {
 	if (process.platform === "win32") return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), APP_DIR);

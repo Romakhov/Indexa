@@ -1,9 +1,9 @@
 {
-	"id": "structure-tree",
-	"name": "Structure Tree",
+	"id": "indexa",
+	"name": "Indexa",
 	"version": "0.0.1",
 	"minAppVersion": "1.5.0",
-	"description": "Local semantic analysis that proposes index notes for your vault. No external AI services.",
+	"description": "Organizes notes by meaning: local semantic analysis proposes index notes. No external AI services.",
 	"author": "kdromahov",
 	"isDesktopOnly": true
 }

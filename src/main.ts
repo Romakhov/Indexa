@@ -3,7 +3,7 @@ import { LocalEmbeddingProvider } from "./embeddings/LocalEmbeddingProvider";
 import { E5_SMALL, ModelStore } from "./embeddings/ModelStore";
 import { runGate0a } from "./spike/gate0a";
 
-export default class StructureTreePlugin extends Plugin {
+export default class IndexaPlugin extends Plugin {
 	onloadMs = 0;
 	modelStore!: ModelStore;
 	private provider: LocalEmbeddingProvider | null = null;
@@ -63,11 +63,11 @@ export default class StructureTreePlugin extends Plugin {
 			const dir = `${this.manifest.dir}/reports`;
 			if (!(await this.app.vault.adapter.exists(dir))) await this.app.vault.adapter.mkdir(dir);
 			await this.app.vault.adapter.write(`${dir}/gate0a.json`, JSON.stringify(report, null, 2));
-			console.log("[structure-tree] Gate 0a report", report);
+			console.log("[indexa] Gate 0a report", report);
 			new Notice(`Gate 0a: ${report.passed ? "PASSED" : "FAILED"} (see console)`);
 			return report;
 		} catch (e) {
-			console.error("[structure-tree] Gate 0a error", e);
+			console.error("[indexa] Gate 0a error", e);
 			new Notice(`Gate 0a error: ${e instanceof Error ? e.message : e}`);
 			throw e;
 		}

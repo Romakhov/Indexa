@@ -1,3 +1,3 @@
 # Dev vault
 
-Test vault for the Structure Tree plugin.
+Test vault for the Indexa plugin.

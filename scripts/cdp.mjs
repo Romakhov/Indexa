@@ -19,7 +19,8 @@ const timeout = Number(opt("--timeout", "600000"));
 const expr = args.join(" ");
 
 const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-const pages = targets.filter((t) => t.type === "page");
+// only main vault windows (popouts / settings windows have other URLs)
+const pages = targets.filter((t) => t.type === "page" && t.url.startsWith("app://obsidian.md/index.html"));
 if (expr === "--list") {
 	console.log(pages.map((p) => p.title).join("\n"));
 	process.exit(0);
