@@ -30,26 +30,38 @@ export class KeywordExtractor {
 	private surface = new Map<string, Map<string, number>>();
 	/** lower-case word -> how often it was written in capitals (acronyms like ВВП, API) */
 	private upper = new Map<string, number>();
-	private readonly docCount: number;
+	private docCount = 0;
 
 	constructor(docs: KeywordDoc[]) {
-		this.docCount = docs.length;
+		for (const d of docs) this.add(d);
+	}
+
+	/** Same as the constructor, giving the UI a turn between documents. */
+	static async create(docs: KeywordDoc[], yieldFn: () => Promise<void>): Promise<KeywordExtractor> {
+		const kx = new KeywordExtractor([]);
 		for (const d of docs) {
-			for (const w of d.text.match(/\p{Lu}[\p{Lu}\d-]{1,}/gu) ?? []) {
-				const l = w.toLowerCase().replace(/ё/g, "е");
-				this.upper.set(l, (this.upper.get(l) ?? 0) + 1);
-			}
-			const counts = new Map<string, number>();
-			for (const t of tokenize(d.text)) {
-				const s = stem(t);
-				counts.set(s, (counts.get(s) ?? 0) + 1);
-				const sf = this.surface.get(s) ?? new Map<string, number>();
-				sf.set(t, (sf.get(t) ?? 0) + 1);
-				this.surface.set(s, sf);
-			}
-			this.tf.set(d.id, counts);
-			for (const s of counts.keys()) this.df.set(s, (this.df.get(s) ?? 0) + 1);
+			kx.add(d);
+			await yieldFn();
 		}
+		return kx;
+	}
+
+	private add(d: KeywordDoc) {
+		this.docCount++;
+		for (const w of d.text.match(/\p{Lu}[\p{Lu}\d-]{1,}/gu) ?? []) {
+			const l = w.toLowerCase().replace(/ё/g, "е");
+			this.upper.set(l, (this.upper.get(l) ?? 0) + 1);
+		}
+		const counts = new Map<string, number>();
+		for (const t of tokenize(d.text)) {
+			const s = stem(t);
+			counts.set(s, (counts.get(s) ?? 0) + 1);
+			const sf = this.surface.get(s) ?? new Map<string, number>();
+			sf.set(t, (sf.get(t) ?? 0) + 1);
+			this.surface.set(s, sf);
+		}
+		this.tf.set(d.id, counts);
+		for (const s of counts.keys()) this.df.set(s, (this.df.get(s) ?? 0) + 1);
 	}
 
 	private idf(s: string) {

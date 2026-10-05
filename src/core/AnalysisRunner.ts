@@ -40,6 +40,8 @@ export interface AnalysisSummary {
 	templateLines: number;
 	errors: { path: string; message: string }[];
 	durationMs: number;
+	/** wall time per stage (spec §73) */
+	stageMs: Partial<Record<Stage, number>>;
 	embedding?: {
 		embedded: number;
 		fromCache: number;
@@ -137,8 +139,18 @@ export class AnalysisRunner {
 
 	async run(onProgress: (p: Progress) => void, signal: AbortSignal): Promise<AnalysisResult> {
 		const t0 = performance.now();
-		const report = (stage: Stage, done: number, total: number) =>
+		const stageMs: Partial<Record<Stage, number>> = {};
+		let current: Stage | null = null;
+		let stageStart = t0;
+		const report = (stage: Stage, done: number, total: number) => {
+			if (stage !== current) {
+				const now = performance.now();
+				if (current) stageMs[current] = Math.round((stageMs[current] ?? 0) + now - stageStart);
+				current = stage;
+				stageStart = now;
+			}
 			onProgress({ stage, stageIndex: STAGES.indexOf(stage), stageCount: STAGES.length, done, total });
+		};
 		const check = () => {
 			if (signal.aborted) throw new AnalysisCancelled();
 		};
@@ -265,12 +277,15 @@ export class AnalysisRunner {
 					check();
 					report("Detecting communities", 0, 1);
 					const content = processed.filter((p) => !p.lowContent);
-					keywords = new KeywordExtractor(content.map((p) => ({ id: p.noteId, text: p.text })));
+					keywords = await KeywordExtractor.create(
+						content.map((p) => ({ id: p.noteId, text: p.text })),
+						maybeYield,
+					);
 					const noteIds = processed.map((p) => p.noteId);
 					const res = await this.embedding.index.cluster({
 						k: this.embedding.topK,
 						noteIds,
-						features: buildNoteFeatures(noteIds, notes, keywords),
+						features: await buildNoteFeatures(noteIds, notes, keywords, 10, maybeYield),
 						include: content.map((p) => p.noteId),
 						weights: clustering.weights,
 						resolution: clustering.resolution,
@@ -298,11 +313,14 @@ export class AnalysisRunner {
 					report("Building proposals", 0, 1);
 					const index = this.embedding.index;
 					const rowNeighbors = new Map(neighbors.ids.map((id, i) => [id, neighborsOf(neighbors!, i).map((n) => n.id)]));
-					const proposalNotes: ProposalNote[] = processed.map((p, i) => {
+					const proposalNotes: ProposalNote[] = [];
+					for (let i = 0; i < processed.length; i++) {
+						await maybeYield();
+						const p = processed[i];
 						const n = notes[i];
 						const entry = cache.peek(p.noteId);
 						const vector = !p.lowContent && entry ? (index.centre(entry.documentVector) ?? undefined) : undefined;
-						return {
+						proposalNotes.push({
 							id: p.noteId,
 							path: n.path,
 							title: n.title,
@@ -312,10 +330,10 @@ export class AnalysisRunner {
 							vector,
 							chunks: vector ? entry?.chunks?.map((c) => ({ heading: c.heading, vector: index.centre(c.vector)! })) : undefined,
 							neighbors: rowNeighbors.get(p.noteId) ?? [],
-						};
-					});
+						});
+					}
 					await maybeYield();
-					proposalSet = buildProposals(proposalNotes, communities, keywords, clustering.proposals);
+					proposalSet = await buildProposals(proposalNotes, communities, keywords, clustering.proposals, maybeYield);
 					proposalNotesOut = proposalNotes;
 					report("Building proposals", 1, 1);
 				}
@@ -350,6 +368,7 @@ export class AnalysisRunner {
 				templateLines: templates.size,
 				errors,
 				durationMs: Math.round(performance.now() - t0),
+				stageMs: current ? { ...stageMs, [current]: Math.round((stageMs[current] ?? 0) + performance.now() - stageStart) } : stageMs,
 			},
 		};
 	}

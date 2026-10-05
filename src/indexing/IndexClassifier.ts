@@ -102,13 +102,27 @@ export function rankIn(sorted: number[], s: number): number {
 
 const percentile = (sorted: number[], p: number) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))))] : 0);
 
-export function classify(notes: ClassifierNote[], communities: Map<string, number>, options: Partial<ClassifierOptions> = {}): ClassifierResult {
+const noYield = async () => undefined;
+
+/**
+ * @param yieldFn called between notes so long runs can give the UI a turn
+ *   (pass a time slicer from the plugin; tests use the default no-op)
+ */
+export async function classify(
+	notes: ClassifierNote[],
+	communities: Map<string, number>,
+	options: Partial<ClassifierOptions> = {},
+	yieldFn: () => Promise<void> = noYield,
+): Promise<ClassifierResult> {
 	const o = { ...DEFAULT_CLASSIFIER_OPTIONS, ...options };
 	// 1–2: confidence of every community member
 	const groups = new Map<number, ClassifierNote[]>();
 	for (const n of notes) {
 		const c = communities.get(n.id);
-		if (c !== undefined) groups.set(c, [...(groups.get(c) ?? []), n]);
+		if (c === undefined) continue;
+		const g = groups.get(c);
+		if (g) g.push(n);
+		else groups.set(c, [n]);
 	}
 	const first = new Map([...groups].map(([c, ms]) => [c, centroidOf(ms.map((m) => m.vector))]));
 	const raw = notes.filter((n) => communities.has(n.id)).map((n) => ({ n, c: communities.get(n.id)!, s: dot(n.vector, first.get(communities.get(n.id)!)!) }));
@@ -116,6 +130,7 @@ export function classify(notes: ClassifierNote[], communities: Map<string, numbe
 	const rankOf = (s: number) => rankIn(sortedScores, s);
 	const confidence = new Map<string, number>();
 	for (const { n, c, s } of raw) {
+		await yieldFn();
 		const near = n.neighbors.filter((id) => communities.has(id)).slice(0, o.neighborsForAgreement);
 		const agree = near.length ? near.filter((id) => communities.get(id) === c).length / near.length : 0;
 		confidence.set(n.id, 0.5 * rankOf(s) + 0.5 * agree);
@@ -146,42 +161,52 @@ export function classify(notes: ClassifierNote[], communities: Map<string, numbe
 	const memberships = new Map<string, Membership[]>();
 	const unclassified: string[] = [];
 	const suggestions = new Map<string, { index: number; score: number }[]>();
+	// per-note scores in reused buffers: allocating a Membership per (note, index)
+	// pair created ~430k objects per run on a 10k vault and showed up as GC pauses
+	const K = centroids.length;
+	const best = new Float64Array(K);
+	/** -1 = whole document; otherwise the index of the best chunk */
+	const bestChunk = new Int32Array(K);
+	const fit = (k: number, n: ClassifierNote, primary: boolean, score: number): Membership => {
+		const c = bestChunk[k];
+		return c < 0 ? { index: k, score, primary, via: "centroid" } : { index: k, score, primary, via: "chunk", heading: n.chunks![c].heading };
+	};
+	const byScore = (a: number, b: number) => best[b] - best[a];
 	for (const n of notes) {
-		const fits: Membership[] = centroids.map((cv, k) => {
-			const doc = dot(n.vector, cv);
-			let best = doc;
-			let via: Membership["via"] = "centroid";
-			let heading: string | undefined;
-			for (const ch of n.chunks ?? []) {
-				const s = o.chunkDiscount * dot(ch.vector, cv);
-				if (s > best) {
-					best = s;
-					via = "chunk";
-					heading = ch.heading;
+		await yieldFn();
+		for (let k = 0; k < K; k++) {
+			best[k] = dot(n.vector, centroids[k]);
+			bestChunk[k] = -1;
+			const chunks = n.chunks;
+			if (chunks)
+				for (let c = 0; c < chunks.length; c++) {
+					const s = o.chunkDiscount * dot(chunks[c].vector, centroids[k]);
+					if (s > best[k]) {
+						best[k] = s;
+						bestChunk[k] = c;
+					}
 				}
-			}
-			return { index: k, score: best, primary: false, via, heading };
-		});
+		}
 		const out: Membership[] = [];
 		const home = coreIndexOf.get(n.id);
 		if (home !== undefined) {
 			out.push({ index: home, score: confidence.get(n.id)!, primary: true, via: "community" });
 		} else {
 			// rescue: fits some index as well as its typical core member
-			const rescue = fits.filter((f) => f.score >= thresholds[f.index].rescue).sort((a, b) => b.score - a.score)[0];
-			if (rescue) out.push({ ...rescue, primary: true, score: fitPercentile(rescue.index, rescue.score) });
+			let rescue = -1;
+			for (let k = 0; k < K; k++) if (best[k] >= thresholds[k].rescue && (rescue < 0 || best[k] > best[rescue])) rescue = k;
+			if (rescue >= 0) out.push(fit(rescue, n, true, fitPercentile(rescue, best[rescue])));
 		}
 		if (!out.length) {
 			unclassified.push(n.id);
+			// closest indexes by similarity; the percentile is usually ~0 for unclassified
+			// notes (they are further out than members), so it only labels the chip
+			const closest: number[] = [];
+			for (let k = 0; k < K; k++) if (best[k] > 0) closest.push(k);
+			closest.sort(byScore);
 			suggestions.set(
 				n.id,
-				// closest indexes by similarity; the percentile is usually ~0 for unclassified
-				// notes (they are further out than members), so it only labels the chip
-				fits
-					.filter((f) => f.score > 0)
-					.sort((a, b) => b.score - a.score)
-					.slice(0, 3)
-					.map((f) => ({ index: f.index, score: fitPercentile(f.index, f.score) })),
+				closest.slice(0, 3).map((k) => ({ index: k, score: fitPercentile(k, best[k]) })),
 			);
 			continue;
 		}
@@ -189,12 +214,13 @@ export function classify(notes: ClassifierNote[], communities: Map<string, numbe
 		// close neighbour already sits there (chunk matches may instead be strong on their own)
 		const near = n.neighbors.slice(0, o.neighborsForAgreement);
 		const supported = (k: number) => near.some((id) => coreIndexOf.get(id) === k);
-		const secondary = fits
-			.filter((f) => f.index !== out[0].index && f.score >= thresholds[f.index].secondary)
-			.filter((f) => supported(f.index) || (f.via === "chunk" && f.score >= thresholds[f.index].rescue))
-			.sort((a, b) => b.score - a.score)
-			.slice(0, o.maxIndexesPerNote - 1)
-			.map((f) => ({ ...f, score: fitPercentile(f.index, f.score) }));
+		const candidates: number[] = [];
+		for (let k = 0; k < K; k++) {
+			if (k === out[0].index || best[k] < thresholds[k].secondary) continue;
+			if (supported(k) || (bestChunk[k] >= 0 && best[k] >= thresholds[k].rescue)) candidates.push(k);
+		}
+		candidates.sort(byScore);
+		const secondary = candidates.slice(0, o.maxIndexesPerNote - 1).map((k) => fit(k, n, false, fitPercentile(k, best[k])));
 		memberships.set(n.id, [...out, ...secondary]);
 	}
 	return { indexes, centroids, memberships, unclassified, suggestions, dissolved, coreScores };

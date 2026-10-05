@@ -53,3 +53,24 @@ describe("significantChange", () => {
 		expect(significantChange(undefined, v(0))).toBe(true);
 	});
 });
+
+import { formatRemaining, StageEta } from "../src/core/eta";
+
+describe("StageEta", () => {
+	it("estimates from the stage's own rate and ignores cached work at the start", () => {
+		const eta = new StageEta();
+		expect(eta.update("Embedding", 5000, 10000, 0)).toBeNull(); // 5000 from cache at once
+		expect(eta.update("Embedding", 5100, 10000, 10000)).toBeNull(); // too early
+		const ms = eta.update("Embedding", 5300, 10000, 60000)!; // 300 notes per minute
+		expect(Math.round(ms / 60000)).toBe(16);
+		expect(formatRemaining(ms)).toBe("about 16 min left");
+		expect(eta.update("Building vector index", 0, 10000, 61000)).toBeNull(); // new stage resets
+		expect(formatRemaining(90 * 60000)).toBe("about 1 h 30 min left");
+
+		// "0" first, then the cached jump: the jump is not counted as speed
+		const e2 = new StageEta();
+		e2.update("Embedding", 0, 10000, 0);
+		e2.update("Embedding", 8800, 10000, 100);
+		expect(Math.round(e2.update("Embedding", 9100, 10000, 60100)! / 60000)).toBe(3);
+	});
+});

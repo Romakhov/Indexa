@@ -1,0 +1,343 @@
+{
+ "vault": "scripts/make-bench-vault.mjs: 9 993 Wikipedia notes, 20 topics RU/EN, 400 long, 100 duplicate names, links, tags",
+ "machine": "Windows 11, 16 threads, CPU inference (WASM, 2 embedding workers)",
+ "coldRuns": [
+  {
+   "size": 500,
+   "memoryBeforeMb": 508,
+   "analysisMs": 107607,
+   "notes": 500,
+   "stageMs": {
+    "Scanning": 71,
+    "Processing": 69,
+    "Embedding": 107083,
+    "Building vector index": 198,
+    "Detecting communities": 109,
+    "Building proposals": 57
+   },
+   "embedding": {
+    "embedded": 500,
+    "fromCache": 0,
+    "notesWithChunks": 105,
+    "chunks": 323,
+    "ms": 107065
+   },
+   "vectorIndex": {
+    "kind": "hnsw",
+    "size": 500,
+    "upserted": 500,
+    "removed": 0,
+    "rebuilt": true,
+    "syncMs": 144,
+    "knnMs": 53,
+    "k": 15
+   },
+   "communities": {
+    "count": 27,
+    "edges": 4582,
+    "ms": 68
+   },
+   "proposals": {
+    "topics": 26,
+    "collections": 0,
+    "unclassified": 61,
+    "multiIndexNotes": 3
+   },
+   "mainThreadLongTasks": {
+    "worstMs": 149,
+    "totalMs": 203,
+    "count": 2
+   },
+   "peakMemoryMb": 2214,
+   "edgesVsPairs": 0.036729,
+   "quality": {
+    "classified": 439,
+    "nmi": 0.841,
+    "purity": 0.519
+   },
+   "annSearchMs": 0.22,
+   "ui": {
+    "effectiveMs": 1,
+    "indexesRenderMs": 3,
+    "unclassifiedRenderMs": 2,
+    "reviewRenderMs": 1
+   },
+   "storageKb": {
+    "cache": 1359,
+    "analysis": 131
+   },
+   "incremental": {
+    "status": "suggested",
+    "processingMs": 966,
+    "wallMs": 969,
+    "suggestions": 1
+   },
+   "pluginReloadMs": 237,
+   "storedRestoredMs": 341,
+   "memoryAfterMb": 977
+  },
+  {
+   "size": 2000,
+   "memoryBeforeMb": 977,
+   "analysisMs": 329532,
+   "notes": 2000,
+   "stageMs": {
+    "Scanning": 114,
+    "Processing": 206,
+    "Embedding": 326801,
+    "Building vector index": 1216,
+    "Detecting communities": 751,
+    "Building proposals": 354
+   },
+   "embedding": {
+    "embedded": 1500,
+    "fromCache": 500,
+    "notesWithChunks": 370,
+    "chunks": 1316,
+    "ms": 326779
+   },
+   "vectorIndex": {
+    "kind": "hnsw",
+    "size": 2000,
+    "upserted": 2000,
+    "removed": 0,
+    "rebuilt": true,
+    "syncMs": 841,
+    "knnMs": 374,
+    "k": 15
+   },
+   "communities": {
+    "count": 35,
+    "edges": 20735,
+    "ms": 494
+   },
+   "proposals": {
+    "topics": 35,
+    "collections": 0,
+    "unclassified": 168,
+    "multiIndexNotes": 74
+   },
+   "mainThreadLongTasks": {
+    "worstMs": 337,
+    "totalMs": 638,
+    "count": 3
+   },
+   "peakMemoryMb": 977,
+   "edgesVsPairs": 0.010373,
+   "quality": {
+    "classified": 1832,
+    "nmi": 0.848,
+    "purity": 0.419
+   },
+   "annSearchMs": 0.26,
+   "ui": {
+    "effectiveMs": 30,
+    "indexesRenderMs": 0,
+    "unclassifiedRenderMs": 0,
+    "reviewRenderMs": 0
+   },
+   "storageKb": {
+    "cache": 5480,
+    "analysis": 476
+   },
+   "incremental": {
+    "status": "suggested",
+    "processingMs": 1443,
+    "wallMs": 1445,
+    "suggestions": 1
+   },
+   "pluginReloadMs": 320,
+   "storedRestoredMs": 1042,
+   "memoryAfterMb": 836
+  },
+  {
+   "size": 5000,
+   "memoryBeforeMb": 836,
+   "cancelled": true,
+   "analysisMs": 520273,
+   "notes": 5000,
+   "stageMs": {
+    "Scanning": 428,
+    "Processing": 688,
+    "Embedding": 513700,
+    "Building vector index": 3468,
+    "Detecting communities": 1517,
+    "Building proposals": 408
+   },
+   "embedding": {
+    "embedded": 2750,
+    "fromCache": 2250,
+    "notesWithChunks": 894,
+    "chunks": 3163,
+    "ms": 513642
+   },
+   "vectorIndex": {
+    "kind": "hnsw",
+    "size": 5000,
+    "upserted": 5000,
+    "removed": 0,
+    "rebuilt": true,
+    "syncMs": 2432,
+    "knnMs": 1035,
+    "k": 15
+   },
+   "communities": {
+    "count": 40,
+    "edges": 55512,
+    "ms": 1140
+   },
+   "proposals": {
+    "topics": 40,
+    "collections": 0,
+    "unclassified": 342,
+    "multiIndexNotes": 293
+   },
+   "mainThreadLongTasks": {
+    "worstMs": 412,
+    "totalMs": 984,
+    "count": 3
+   },
+   "peakMemoryMb": 836,
+   "edgesVsPairs": 0.004442,
+   "quality": {
+    "classified": 4658,
+    "nmi": 0.854,
+    "purity": 0.43
+   },
+   "annSearchMs": 0.33,
+   "ui": {
+    "effectiveMs": 68,
+    "indexesRenderMs": 0,
+    "unclassifiedRenderMs": 0,
+    "reviewRenderMs": 0
+   },
+   "storageKb": {
+    "cache": 13492,
+    "analysis": 1162
+   },
+   "incremental": {
+    "status": "suggested",
+    "processingMs": 1125,
+    "wallMs": 1129,
+    "suggestions": 1
+   },
+   "pluginReloadMs": 244,
+   "storedRestoredMs": 346,
+   "memoryAfterMb": 1186
+  },
+  {
+   "size": 10000,
+   "memoryBeforeMb": 1186,
+   "analysisMs": 1123632,
+   "notes": 9993,
+   "stageMs": {
+    "Scanning": 430,
+    "Processing": 989,
+    "Embedding": 1110515,
+    "Building vector index": 7644,
+    "Detecting communities": 3161,
+    "Building proposals": 803
+   },
+   "embedding": {
+    "embedded": 4993,
+    "fromCache": 5000,
+    "notesWithChunks": 1753,
+    "chunks": 6102,
+    "ms": 1110410
+   },
+   "vectorIndex": {
+    "kind": "hnsw",
+    "size": 9993,
+    "upserted": 9993,
+    "removed": 0,
+    "rebuilt": true,
+    "syncMs": 5503,
+    "knnMs": 2140,
+    "k": 15
+   },
+   "communities": {
+    "count": 43,
+    "edges": 115288,
+    "ms": 2398
+   },
+   "proposals": {
+    "topics": 43,
+    "collections": 0,
+    "unclassified": 561,
+    "multiIndexNotes": 702
+   },
+   "mainThreadLongTasks": {
+    "worstMs": 802,
+    "totalMs": 1706,
+    "count": 3
+   },
+   "peakMemoryMb": 1186,
+   "edgesVsPairs": 0.002309,
+   "quality": {
+    "classified": 9432,
+    "nmi": 0.842,
+    "purity": 0.423
+   },
+   "annSearchMs": 0.35,
+   "ui": {
+    "effectiveMs": 326,
+    "indexesRenderMs": 0,
+    "unclassifiedRenderMs": 0,
+    "reviewRenderMs": 0
+   },
+   "storageKb": {
+    "cache": 26614,
+    "analysis": 2299
+   },
+   "incremental": {
+    "status": "suggested",
+    "processingMs": 1434,
+    "wallMs": 1438,
+    "suggestions": 1
+   },
+   "pluginReloadMs": 251,
+   "storedRestoredMs": 367,
+   "memoryAfterMb": 1325
+  },
+  {
+   "applyUndo": {
+    "notes": 9432,
+    "indexes": 43,
+    "planMs": 729,
+    "applyMs": 32810,
+    "ops": 9476,
+    "undoMs": 20996,
+    "memoryBeforeMb": 1325,
+    "memoryAfterMb": 698
+   }
+  }
+ ],
+ "after10kOptimisation": {
+  "note": "cached 10k re-analysis after Phase 9 fixes (pathOf reverse index, cooperative classification/keywords/features, allocation-free scoring, cached model check)",
+  "stageMs": {
+   "Scanning": 569,
+   "Processing": 1043,
+   "Embedding": 257,
+   "Building vector index": 7567,
+   "Detecting communities": 3745,
+   "Building proposals": 1639
+  },
+  "mainThreadLongTasks": {
+   "worstMs": 330,
+   "totalMs": 693,
+   "count": 3,
+   "before": {
+    "worstMs": 802,
+    "totalMs": 1706
+   }
+  },
+  "reviewEffectiveMs": {
+   "before": 326,
+   "after": 12
+  },
+  "quality": {
+   "nmi": 0.844,
+   "purity": 0.965
+  }
+ }
+}

@@ -31,12 +31,13 @@ const dot = (a: Float32Array, b: Float32Array) => {
 
 const stableId = (prefix: string, ids: string[]) => `${prefix}-${contentHash([...ids].sort().slice(0, 50).join("|")).slice(0, 10)}`;
 
-export function buildProposals(
+export async function buildProposals(
 	notes: ProposalNote[],
 	communities: Map<string, number>,
 	keywords: KeywordExtractor,
 	options: Partial<ProposalOptions> & Pick<ProposalOptions, "minNotes" | "maxIndexesPerNote">,
-): ProposalSet {
+	yieldFn?: () => Promise<void>,
+): Promise<ProposalSet> {
 	const relatedPerIndex = options.relatedPerIndex ?? 3;
 	const byId = new Map(notes.map((n) => [n.id, n]));
 	const content = notes.filter((n) => !n.lowContent && n.vector);
@@ -53,10 +54,11 @@ export function buildProposals(
 	collections.forEach((c, i) => c.noteIds.forEach((id) => inCollection.set(id, i)));
 
 	// topics from the content notes
-	const cls = classify(
+	const cls = await classify(
 		content.map<ClassifierNote>((n) => ({ id: n.id, vector: n.vector!, chunks: n.chunks, neighbors: n.neighbors })),
 		communities,
 		options,
+		yieldFn,
 	);
 
 	const members: IndexMember[][] = cls.indexes.map(() => []);

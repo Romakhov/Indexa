@@ -41,6 +41,10 @@ describe("NoteIdRegistry", () => {
 		r.rename("A/Note.md", "C/Renamed.md");
 		expect(r.idFor("C/Renamed.md")).toBe(a);
 		expect(r.peek("A/Note.md")).toBeUndefined();
+		expect(r.pathOf(a)).toBe("C/Renamed.md");
+		r.remove("C/Renamed.md");
+		expect(r.pathOf(a)).toBeUndefined();
+		expect(r.pathOf(b)).toBe("B/Note.md");
 	});
 
 	it("round-trips through serialize/load and prunes missing paths", () => {

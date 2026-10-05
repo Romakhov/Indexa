@@ -31,6 +31,8 @@ export default class IndexaPlugin extends Plugin {
 	modelStore!: ModelStore;
 	onloadMs = 0;
 	lastSummary: AnalysisSummary | null = null;
+	/** dev/benchmark only: observes analysis progress */
+	debugProgressHook: ((p: import("./core/AnalysisRunner").Progress) => void) | null = null;
 	/** in memory only; proposals built from it arrive in Phase 4–5 */
 	lastResult: AnalysisResult | null = null;
 	/** latest proposals; survives restarts through AnalysisStore */
@@ -279,7 +281,10 @@ export default class IndexaPlugin extends Plugin {
 			: undefined;
 		if (!embedding) new Notice("Local semantic model is not installed: only text preparation will run.");
 		try {
-			const result = await new AnalysisRunner(scanner, embedding).run((p) => this.views().forEach((v) => v.setProgress(p)), controller.signal);
+			const result = await new AnalysisRunner(scanner, embedding).run((p) => {
+				this.debugProgressHook?.(p);
+				this.views().forEach((v) => v.setProgress(p));
+			}, controller.signal);
 			this.lastSummary = result.summary;
 			this.lastResult = result;
 			if (result.proposals) {
@@ -396,8 +401,12 @@ export default class IndexaPlugin extends Plugin {
 		return this.cache;
 	}
 
+	/** cached: the view asks on every progress update, and the check is synchronous file I/O */
+	private modelInstalled: boolean | null = null;
+
 	isModelInstalled() {
-		return this.modelStore.isInstalled(E5_SMALL);
+		this.modelInstalled ??= this.modelStore.isInstalled(E5_SMALL);
+		return this.modelInstalled;
 	}
 
 	modelDownloadMb() {
@@ -412,6 +421,7 @@ export default class IndexaPlugin extends Plugin {
 		const notice = new Notice(`Downloading local semantic model (~${this.modelDownloadMb()} MB)…`, 0);
 		try {
 			await this.modelStore.download(E5_SMALL, (file, i, n) => notice.setMessage(`Downloading model ${i}/${n}: ${file}`));
+			this.modelInstalled = null;
 			notice.setMessage("Local semantic model installed.");
 		} catch (e) {
 			notice.setMessage(`Model download failed: ${e instanceof Error ? e.message : e}`);

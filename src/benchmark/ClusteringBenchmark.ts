@@ -72,7 +72,7 @@ export async function clusteringBenchmark(input: BenchmarkInput, resolutions = [
 	const rows = table.ids.map((_, i) => i).filter((i) => include[i]);
 	const rowIds = rows.map((i) => table.ids[i]);
 	const keywords = new KeywordExtractor(input.processed.filter((p) => content.has(p.noteId)).map((p) => ({ id: p.noteId, text: p.text })));
-	const features = buildNoteFeatures(table.ids, input.notes, keywords);
+	const features = await buildNoteFeatures(table.ids, input.notes, keywords);
 	const sim = (i: number, j: number) => dot(input.vectors.get(table.ids[i])!, input.vectors.get(table.ids[j])!);
 	const engine = new CommunityClusterEngine();
 	const results: Scored[] = [];

@@ -18,7 +18,7 @@ and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Wo
 | 6 — review UI: rename, merge, split, ignore, add/remove notes, main/secondary index, unclassified | done |
 | 7 — apply + undo: index notes, zk-indexes, change journal, stacked undo | done |
 | 8 — incremental mode: new / changed / renamed / deleted notes, review queue | done |
-| 9 — large-vault stabilisation: 2k / 5k / 10k benchmarks | next |
+| 9 — large-vault stabilisation: 500 / 2k / 5k / 10k benchmarks, fixes from measurements | done |
 
 What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
 progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache,
@@ -138,3 +138,31 @@ and memberships. Indexa's own writes are recognised by content and never re-proc
 
 Measured on the 954-note vault copy: new note → suggestion in ~1.3 s after the debounce
 (model loaded lazily), 5 rapid edits → 1 job.
+
+## Large vaults (spec §68–75, §93)
+
+Reproducible benchmark vault: `node scripts/make-bench-vault.mjs <dir> 10000` (Wikipedia, 20 topics,
+RU/EN, long notes, links, tags, duplicate file names). Full numbers:
+[`reports/bench-large-vault.json`](reports/bench-large-vault.json). Windows, 16 threads, CPU only,
+2 embedding workers:
+
+| | 500 | 2 000 | 5 000 | 10 000 |
+|---|---|---|---|---|
+| first analysis (embedding dominates) | ~1.8 min | ~5.5 min | ~14 min | ~37 min |
+| re-analysis from cache | < 1 s | ~3 s | ~8 s | ~15 s |
+| vector index build + top-K (worker) | 0.2 s | 1.2 s | 3.5 s | 7.6 s |
+| Louvain (worker) | 0.07 s | 0.5 s | 1.1 s | 2.4 s |
+| graph edges / all note pairs | 3.7% | 1.0% | 0.44% | 0.23% |
+| ANN query | 0.22 ms | 0.26 ms | 0.33 ms | 0.35 ms |
+| new note → index suggestion | 1.0 s | 1.4 s | 1.1 s | 1.4 s |
+| embedding cache on disk | 1.4 MB | 5.5 MB | 13.5 MB | 26.6 MB |
+| clusters vs 20 known topics (NMI) | 0.84 | 0.85 | 0.85 | 0.84 |
+
+10 000 notes: Apply 33 s (9 432 notes, 43 indexes), Undo 21 s; peak renderer memory ~1.2 GB during
+analysis (two model workers), released afterwards. Analysis can be cancelled at any point; the next run
+continues from the cache. The progress view shows the remaining time of long stages.
+
+Measured and fixed in this phase: note-id → path lookup was linear (Review recomputation 326 ms → 12 ms
+at 10k); classification, keyword extraction and graph features now yield to the UI; scoring no longer
+allocates an object per (note, index) pair; the model-installed check is cached. Longest main-thread
+pause during a 10k analysis: 802 ms → 330 ms (remaining pauses are garbage collection).

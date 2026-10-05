@@ -1,5 +1,6 @@
 import { ItemView, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import { STAGES, type Progress } from "../core/AnalysisRunner";
+import { formatRemaining, StageEta } from "../core/eta";
 import type IndexaPlugin from "../main";
 import { ReviewPanels } from "./ReviewPanels";
 
@@ -18,6 +19,8 @@ const nf = new Intl.NumberFormat();
 export class MainView extends ItemView {
 	private tab: Tab = "overview";
 	private progress: Progress | null = null;
+	private eta = new StageEta();
+	private remainingMs: number | null = null;
 	private panels: ReviewPanels;
 
 	constructor(
@@ -52,6 +55,8 @@ export class MainView extends ItemView {
 	/** Called by the plugin whenever analysis state changes. */
 	setProgress(p: Progress | null) {
 		this.progress = p;
+		this.remainingMs = p ? this.eta.update(p.stage, p.done, p.total) : null;
+		if (!p) this.eta = new StageEta();
 		this.render();
 	}
 
@@ -157,10 +162,11 @@ export class MainView extends ItemView {
 		card.createDiv({ cls: "indexa-stage", text: p.stage });
 		if (p.total > 0) {
 			const pct = Math.round((p.done / p.total) * 100);
-			card.createDiv({ text: `${nf.format(p.done)} / ${nf.format(p.total)} · ${pct}%` });
+			card.createDiv({ text: `${nf.format(p.done)} / ${nf.format(p.total)} · ${pct}%` + (this.remainingMs !== null ? ` · ${formatRemaining(this.remainingMs)}` : "") });
 			const bar = card.createDiv({ cls: "indexa-bar" });
 			bar.createDiv({ cls: "indexa-bar-fill" }).style.width = `${pct}%`;
 		}
+		if (p.stage === "Embedding") card.createDiv({ cls: "indexa-muted", text: "You can keep working. Cancelling keeps everything computed so far; the next run continues from there." });
 		const cancel = card.createEl("button", { text: "Cancel" });
 		cancel.onclick = () => this.plugin.cancelAnalysis();
 	}

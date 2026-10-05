@@ -58,7 +58,8 @@ function evaluate(set: ProposalSet, r: AnalysisResult) {
 
 export async function proposalsEval(_app: App, r: AnalysisResult, base: Parameters<typeof buildProposals>[3], cuts = [0.2, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6]) {
 	if (!r.proposalNotes || !r.communities || !r.keywords) throw new Error("Run Analyze vault first");
-	const sweep = cuts.map((minConfidence) => ({ minConfidence, ...evaluate(buildProposals(r.proposalNotes!, r.communities!, r.keywords!, { ...base, minConfidence }), r) }));
+	const sweep = [];
+	for (const minConfidence of cuts) sweep.push({ minConfidence, ...evaluate(await buildProposals(r.proposalNotes!, r.communities!, r.keywords!, { ...base, minConfidence }), r) });
 	return { sweep };
 }
 

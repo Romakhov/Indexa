@@ -151,7 +151,7 @@ export class ReviewController {
 			}
 		}
 		const sub: ProposalSet | null = communities
-			? buildProposals(
+			? await buildProposals(
 					r.proposalNotes.filter((n) => members.has(n.id)),
 					communities,
 					r.keywords,

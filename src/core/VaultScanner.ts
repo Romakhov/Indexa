@@ -29,7 +29,8 @@ export class ObsidianVaultScanner implements VaultScanner {
 
 	async scanWithStats(signal?: AbortSignal): Promise<ScanResult> {
 		const rules = this.rules();
-		const files = this.app.vault.getMarkdownFiles().sort((a, b) => a.path.localeCompare(b.path));
+		// plain code-unit order: deterministic and ~10x cheaper than localeCompare on 10k paths
+		const files = this.app.vault.getMarkdownFiles().sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 		const excluded: Record<ExclusionReason, number> = { folder: 0, frontmatter: 0, tag: 0, "generated-index": 0, drawing: 0, config: 0 };
 		const notes: NoteDocument[] = [];
 		const maybeYield = timeSlicer();

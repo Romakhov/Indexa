@@ -73,15 +73,15 @@ describe("IndexClassifier", () => {
 	];
 	const communities = new Map(notes.map((n) => [n.id, n.id.startsWith("b") ? 1 : 0]));
 
-	it("peels the loner off into unclassified and keeps the topics", () => {
-		const res = classify(notes, communities, { minNotes: 3, minConfidence: 0.3, secondaryPercentile: 0.1 });
+	it("peels the loner off into unclassified and keeps the topics", async () => {
+		const res = await classify(notes, communities, { minNotes: 3, minConfidence: 0.3, secondaryPercentile: 0.1 });
 		expect(res.indexes).toHaveLength(2);
 		expect(res.unclassified).toContain("loner");
 		expect(res.memberships.get("a1")![0]).toMatchObject({ primary: true, via: "community" });
 	});
 
-	it("gives a long note a secondary index through its chunk", () => {
-		const res = classify(notes, communities, { minNotes: 3, minConfidence: 0.3, secondaryPercentile: 0.1 });
+	it("gives a long note a secondary index through its chunk", async () => {
+		const res = await classify(notes, communities, { minNotes: 3, minConfidence: 0.3, secondaryPercentile: 0.1 });
 		const m = res.memberships.get("weekly")!;
 		const b = res.indexes.indexOf(1);
 		expect(m[0].primary).toBe(true);
@@ -96,7 +96,7 @@ describe("IndexClassifier", () => {
 });
 
 describe("buildProposals", () => {
-	it("produces named topics, collections and unclassified notes", () => {
+	it("produces named topics, collections and unclassified notes", async () => {
 		const mk = (id: string, title: string, axis: number, group: string[]): ProposalNote => ({
 			id,
 			path: `${id}.md`,
@@ -123,14 +123,14 @@ describe("buildProposals", () => {
 		];
 		const communities = new Map([...a.map((id) => [id, 0] as const), ...k.map((id) => [id, 1] as const)]);
 		const kx = new KeywordExtractor(notes.filter((n) => !n.lowContent).map((n) => ({ id: n.id, text: n.title })));
-		const set = buildProposals(notes, communities, kx, { minNotes: 3, maxIndexesPerNote: 3, minConfidence: 0.2 });
+		const set = await buildProposals(notes, communities, kx, { minNotes: 3, maxIndexesPerNote: 3, minConfidence: 0.2 });
 		const names = set.proposals.map((p) => p.name.primary);
 		expect(names).toContain("Планирование");
 		expect(names).toContain("Kafka");
 		expect(set.proposals.find((p) => p.kind === "collection")?.members).toHaveLength(4);
 		expect(set.unclassified).toContain("orphan");
 		// ids are stable for the same core members
-		const again = buildProposals(notes, communities, kx, { minNotes: 3, maxIndexesPerNote: 3, minConfidence: 0.2 });
+		const again = await buildProposals(notes, communities, kx, { minNotes: 3, maxIndexesPerNote: 3, minConfidence: 0.2 });
 		expect(again.proposals.map((p) => p.id)).toEqual(set.proposals.map((p) => p.id));
 	});
 });

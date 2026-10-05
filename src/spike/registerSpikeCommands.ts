@@ -4,6 +4,7 @@
 import { Notice } from "obsidian";
 import { benchmarkEmbedding, type EmbeddingBenchmarkOptions } from "../benchmark/BenchmarkRunner";
 import { clusteringBenchmark } from "../benchmark/ClusteringBenchmark";
+import { largeVaultBenchmark, pluginManager, type LargeVaultOptions } from "../benchmark/LargeVaultBenchmark";
 import { cosine } from "../embeddings/EmbeddingProvider";
 import { E5_SMALL } from "../embeddings/ModelStore";
 import { PooledEmbeddingProvider } from "../embeddings/PooledEmbeddingProvider";
@@ -108,6 +109,14 @@ export function registerSpikeCommands(plugin: IndexaPlugin) {
 			return { ...report, note: await writeProposalReport(plugin.app, r) };
 		},
 		labelBank: () => labelBankExperiment(plugin),
+		async largeVault(options: Partial<LargeVaultOptions> = {}) {
+			const report = await largeVaultBenchmark(plugin, { sizes: [500, 2000, 5000, 10000], cancelAt: 5000, applyUndo: true, ...options });
+			const p = pluginManager(plugin.app).plugins.indexa as IndexaPlugin; // the benchmark reloads the plugin
+			const dir = `${p.manifest.dir}/reports`;
+			if (!(await p.app.vault.adapter.exists(dir))) await p.app.vault.adapter.mkdir(dir);
+			await p.app.vault.adapter.write(`${dir}/bench-large-vault.json`, JSON.stringify(report, null, 2));
+			return report;
+		},
 		async hubness(k = 5) {
 			if (!plugin.lastResult) throw new Error("Run Analyze vault first");
 			const report = hubnessExperiment(plugin.app, plugin.lastResult, plugin.getCache(), k);

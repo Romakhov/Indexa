@@ -4,6 +4,8 @@
 
 export class NoteIdRegistry {
 	private byPath = new Map<string, string>();
+	/** reverse index: id -> path (pathOf() is called for every member when rendering Review) */
+	private byId = new Map<string, string>();
 	private dirty = false;
 
 	constructor(private readonly newId: () => string = () => crypto.randomUUID()) {}
@@ -21,14 +23,14 @@ export class NoteIdRegistry {
 		if (!id) {
 			id = this.newId();
 			this.byPath.set(path, id);
+			this.byId.set(id, path);
 			this.dirty = true;
 		}
 		return id;
 	}
 
 	pathOf(id: string): string | undefined {
-		for (const [p, i] of this.byPath) if (i === id) return p;
-		return undefined;
+		return this.byId.get(id);
 	}
 
 	peek(path: string): string | undefined {
@@ -40,11 +42,16 @@ export class NoteIdRegistry {
 		if (!id) return;
 		this.byPath.delete(oldPath);
 		this.byPath.set(newPath, id);
+		this.byId.set(id, newPath);
 		this.dirty = true;
 	}
 
 	remove(path: string) {
-		if (this.byPath.delete(path)) this.dirty = true;
+		const id = this.byPath.get(path);
+		if (id !== undefined && this.byPath.delete(path)) {
+			this.byId.delete(id);
+			this.dirty = true;
+		}
 	}
 
 	/** Drops entries for paths that no longer exist. */
@@ -57,6 +64,7 @@ export class NoteIdRegistry {
 		this.byPath = new Map(
 			data && typeof data === "object" ? Object.entries(data as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === "string") : [],
 		);
+		this.byId = new Map([...this.byPath].map(([p, i]) => [i, p]));
 		this.dirty = false;
 	}
 
