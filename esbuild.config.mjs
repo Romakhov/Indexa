@@ -36,6 +36,20 @@ const workerResult = await esbuild.build({
 });
 const workerCode = workerResult.outputFiles[0].text;
 
+// Step 1b: the analysis worker (vector index, graph, clustering). No ML model.
+const analysisResult = await esbuild.build({
+	entryPoints: ["src/analysis/analysis.worker.ts"],
+	bundle: true,
+	write: false,
+	format: "iife",
+	platform: "browser",
+	target: "es2022",
+	minify: prod,
+	define: { "import.meta.url": "undefined" },
+	logLevel: "warning",
+});
+const analysisWorkerCode = analysisResult.outputFiles[0].text;
+
 // Step 2: the plugin itself. The worker source is injected as a string and
 // started from a Blob URL at runtime (lazily, never in onload()).
 await esbuild.build({
@@ -46,7 +60,7 @@ await esbuild.build({
 	target: "es2022",
 	minify: prod,
 	external: ["obsidian", "electron", "fs", "path", "os", "crypto"],
-	define: { __WORKER_CODE__: JSON.stringify(workerCode), __SPIKE__: String(spike), __ORT_FLAVOUR__: JSON.stringify(ort) },
+	define: { __WORKER_CODE__: JSON.stringify(workerCode), __ANALYSIS_WORKER_CODE__: JSON.stringify(analysisWorkerCode), __SPIKE__: String(spike), __ORT_FLAVOUR__: JSON.stringify(ort) },
 	outfile: path.join(outDir, "main.js"),
 	logLevel: "info",
 });
@@ -54,4 +68,4 @@ await esbuild.build({
 if (outDir !== ".") for (const f of ["manifest.json", "styles.css"]) fs.copyFileSync(f, path.join(outDir, f));
 
 const size = (f) => (fs.statSync(f).size / 1024 / 1024).toFixed(2) + " MB";
-console.log(`spike: ${spike}, ort: ${ort}, worker: ${(workerCode.length / 1024 / 1024).toFixed(2)} MB, main.js: ${size(path.join(outDir, "main.js"))}`);
+console.log(`spike: ${spike}, ort: ${ort}, worker: ${(workerCode.length / 1024 / 1024).toFixed(2)} MB, analysis worker: ${(analysisWorkerCode.length / 1024 / 1024).toFixed(2)} MB, main.js: ${size(path.join(outDir, "main.js"))}`);

@@ -1,0 +1,31 @@
+{
+  "notes": 363,
+  "labeled": 260,
+  "k": 5,
+  "variants": {
+    "blend": {
+      "labelAgreementAtK": 0.329,
+      "maxInDegree": 67,
+      "top1PercentShare": 0.105,
+      "zeroInDegree": 92
+    },
+    "chunkMean": {
+      "labelAgreementAtK": 0.297,
+      "maxInDegree": 149,
+      "top1PercentShare": 0.16,
+      "zeroInDegree": 129
+    },
+    "blendCentered": {
+      "labelAgreementAtK": 0.428,
+      "maxInDegree": 16,
+      "top1PercentShare": 0.035,
+      "zeroInDegree": 10
+    },
+    "chunkMeanCentered": {
+      "labelAgreementAtK": 0.441,
+      "maxInDegree": 17,
+      "top1PercentShare": 0.036,
+      "zeroInDegree": 13
+    }
+  }
+}

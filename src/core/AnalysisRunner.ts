@@ -6,6 +6,8 @@ import type { NoteDocument, ProcessedNote } from "../types/NoteDocument";
 import type { EmbeddingCache } from "../embeddings/EmbeddingCache";
 import type { EmbeddingProvider } from "../embeddings/EmbeddingProvider";
 import { EmbeddingCancelled, embedNotes, type NoteToEmbed } from "../embeddings/NoteEmbedder";
+import type { NeighborTable } from "../vectors/NeighborTable";
+import type { VectorIndexService } from "../vectors/VectorIndexService";
 import { bodyLines, processNote } from "./MarkdownProcessor";
 import { chunkNote, type Chunk } from "./SemanticChunker";
 import { detectTemplateLines } from "./TemplateDetector";
@@ -39,6 +41,16 @@ export interface AnalysisSummary {
 		chunks: number;
 		ms: number;
 	};
+	vectorIndex?: {
+		kind: string;
+		size: number;
+		upserted: number;
+		removed: number;
+		rebuilt: boolean;
+		syncMs: number;
+		knnMs: number;
+		k: number;
+	};
 }
 
 export interface EmbeddingDeps {
@@ -46,6 +58,10 @@ export interface EmbeddingDeps {
 	cache: EmbeddingCache;
 	/** batches in flight (= worker pool size) */
 	parallel: number;
+	/** omit to stop after embeddings */
+	index?: VectorIndexService;
+	/** neighbours per note for the similarity graph */
+	topK: number;
 }
 
 export interface AnalysisResult {
@@ -53,6 +69,8 @@ export interface AnalysisResult {
 	notes: NoteDocument[];
 	processed: ProcessedNote[];
 	chunks: Map<string, Chunk[]>;
+	/** top-K semantic neighbours of every note (Phase 3) */
+	neighbors?: NeighborTable;
 }
 
 export class AnalysisCancelled extends Error {
@@ -119,6 +137,8 @@ export class AnalysisRunner {
 
 		const chunks = new Map<string, Chunk[]>();
 		let embeddingSummary: AnalysisSummary["embedding"];
+		let vectorIndexSummary: AnalysisSummary["vectorIndex"];
+		let neighbors: NeighborTable | undefined;
 		if (this.embedding) {
 			const { provider, cache, parallel } = this.embedding;
 			const toEmbed: NoteToEmbed[] = [];
@@ -158,14 +178,44 @@ export class AnalysisRunner {
 				// finished notes survive a cancel or an error (spec §67)
 				await cache.save();
 			}
+
+			if (this.embedding.index) {
+				check();
+				report("Building vector index", 0, processed.length);
+				const ts = performance.now();
+				const sync = await this.embedding.index.sync(
+					cache,
+					processed.map((p) => p.noteId),
+					{
+						meanIds: processed.filter((p) => !p.lowContent).map((p) => p.noteId),
+						onProgress: (d, t) => report("Building vector index", d, t),
+					},
+				);
+				const syncMs = Math.round(performance.now() - ts);
+				check();
+				const tk = performance.now();
+				neighbors = await this.embedding.index.knnAll(this.embedding.topK, (d, t) => report("Building vector index", d, t));
+				vectorIndexSummary = {
+					kind: sync.stats.kind,
+					size: sync.stats.size,
+					upserted: sync.upserted,
+					removed: sync.removed,
+					rebuilt: sync.rebuilt,
+					syncMs,
+					knnMs: Math.round(performance.now() - tk),
+					k: this.embedding.topK,
+				};
+			}
 		}
 
 		return {
 			notes,
 			processed,
 			chunks,
+			neighbors,
 			summary: {
 				embedding: embeddingSummary,
+				vectorIndex: vectorIndexSummary,
 				finishedAt: Date.now(),
 				totalFiles: scan.total,
 				analysable: processed.length,

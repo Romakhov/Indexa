@@ -4,6 +4,7 @@ declare module "*.wasm" {
 }
 
 declare const __WORKER_CODE__: string;
+declare const __ANALYSIS_WORKER_CODE__: string;
 declare const __SPIKE__: boolean;
 declare const __ORT_FLAVOUR__: "wasm" | "webgpu";
 

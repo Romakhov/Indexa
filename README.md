@@ -12,15 +12,19 @@ and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Wo
 | 0 — technical spike (Gates 0a–0c) | done — reports in [`reports/`](reports/) |
 | 1 — plugin foundation: settings, main view, vault scanner, Markdown processing | done |
 | 2 — semantic pipeline: chunking, embeddings, cache, queue | done |
-| 3 — vector search: HNSW index, persistence, top-K (in the worker) | next |
+| 3 — vector search: HNSW index in a worker, rebuild from cache, top-K | done |
+| 4 — similarity graph + community detection (Louvain), clustering benchmark | next |
 
 What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
-progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache),
-settings, model download. Nothing in the vault is modified.
+progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache,
+HNSW vector index with top-K neighbours of every note), settings, model download. Nothing in the vault is modified.
 
 Measured on a real 932-note vault (Windows, 16 threads): first analysis ≈4 min with 2 embedding
 workers, re-analysis from cache 0.3 s. Each worker holds its own model copy (~0.5 GB RAM); workers are
-released after 5 minutes without semantic work.
+released after 5 minutes without semantic work. The vector index lives in a separate light worker
+(no model) and is rebuilt from the embedding cache after a restart: 0.25 s for 930 notes, ~4 s for
+10 000 (synthetic), without blocking the UI. Vectors are mean-centred before indexing, which removes
+"hub" notes that otherwise look similar to everything.
 
 ## Privacy and network use
 

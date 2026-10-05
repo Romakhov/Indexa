@@ -1,0 +1,13 @@
+{
+  "n": 10000,
+  "kind": "hnsw",
+  "buildMs": 4182,
+  "knnMs": 1277,
+  "noChangeSyncMs": 2,
+  "noChangeUpserted": 0,
+  "edgesUpperBound": 150000,
+  "mainThreadLongTasks": {
+    "worstMs": 179,
+    "count": 1
+  }
+}

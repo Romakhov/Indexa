@@ -11,6 +11,8 @@ import { AdapterBinaryStore } from "../storage/BinaryStore";
 import { runGate0a } from "./gate0a";
 import { runGate0b } from "./gate0b";
 import { runGate0c, type Gate0cOptions } from "./gate0c";
+import { hubnessExperiment } from "./hubness";
+import { indexScale } from "./indexScale";
 import { longNoteCheck } from "./longNote";
 
 export function registerSpikeCommands(plugin: IndexaPlugin) {
@@ -57,6 +59,17 @@ export function registerSpikeCommands(plugin: IndexaPlugin) {
 				await cpu.dispose();
 				await gpu.dispose();
 			}
+		},
+		async hubness(k = 5) {
+			if (!plugin.lastResult) throw new Error("Run Analyze vault first");
+			const report = hubnessExperiment(plugin.app, plugin.lastResult, plugin.getCache(), k);
+			await writeReport("hubness.json", report);
+			return report;
+		},
+		async indexScale(n = 10000) {
+			const report = await indexScale(plugin.getVectorIndex(), n);
+			await writeReport(`index-scale-${n}.json`, report);
+			return report;
 		},
 		async longNote() {
 			const report = await longNoteCheck(plugin.getProvider());

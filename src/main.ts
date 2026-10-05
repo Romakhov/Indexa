@@ -1,5 +1,7 @@
 import { debounce, Notice, Plugin, TFile } from "obsidian";
-import { AnalysisCancelled, AnalysisRunner, type AnalysisSummary } from "./core/AnalysisRunner";
+import { AnalysisWorkerClient } from "./analysis/AnalysisWorkerClient";
+import { AnalysisCancelled, AnalysisRunner, type AnalysisResult, type AnalysisSummary } from "./core/AnalysisRunner";
+import { VectorIndexService } from "./vectors/VectorIndexService";
 import { NoteIdRegistry } from "./core/NoteIdRegistry";
 import { ObsidianVaultScanner } from "./core/VaultScanner";
 import { EmbeddingCache } from "./embeddings/EmbeddingCache";
@@ -22,12 +24,16 @@ export default class IndexaPlugin extends Plugin {
 	modelStore!: ModelStore;
 	onloadMs = 0;
 	lastSummary: AnalysisSummary | null = null;
+	/** in memory only; proposals built from it arrive in Phase 4–5 */
+	lastResult: AnalysisResult | null = null;
 
 	private noteIds = new NoteIdRegistry();
 	private provider: LocalEmbeddingProvider | null = null;
 	private pool: PooledEmbeddingProvider | null = null;
 	private poolIdleTimer: number | null = null;
 	private cache: EmbeddingCache | null = null;
+	private analysisWorker = new AnalysisWorkerClient();
+	private vectorIndex: VectorIndexService | null = null;
 	private analysis: AbortController | null = null;
 	private readonly saveNoteIdsSoon = debounce(() => void this.saveNoteIds(), 2000, true);
 
@@ -56,6 +62,7 @@ export default class IndexaPlugin extends Plugin {
 		await this.saveNoteIds();
 		await this.provider?.dispose();
 		await this.disposePool();
+		this.analysisWorker.terminate();
 	}
 
 	private async onLayoutReady() {
@@ -150,12 +157,19 @@ export default class IndexaPlugin extends Plugin {
 			configDir: this.app.vault.configDir,
 		}));
 		const embedding = this.isModelInstalled()
-			? { provider: this.getPool(), cache: this.getCache(), parallel: this.settings.embeddingWorkers }
+			? {
+					provider: this.getPool(),
+					cache: this.getCache(),
+					parallel: this.settings.embeddingWorkers,
+					index: this.getVectorIndex(),
+					topK: this.settings.topK,
+				}
 			: undefined;
 		if (!embedding) new Notice("Local semantic model is not installed: only text preparation will run.");
 		try {
 			const result = await new AnalysisRunner(scanner, embedding).run((p) => this.views().forEach((v) => v.setProgress(p)), controller.signal);
 			this.lastSummary = result.summary;
+			this.lastResult = result;
 			await this.saveNoteIds();
 		} catch (e) {
 			if (e instanceof AnalysisCancelled) new Notice("Analysis cancelled. Nothing in your vault was changed.");
@@ -206,6 +220,11 @@ export default class IndexaPlugin extends Plugin {
 		const p = this.pool;
 		this.pool = null;
 		await p?.dispose();
+	}
+
+	getVectorIndex(): VectorIndexService {
+		this.vectorIndex ??= new VectorIndexService(this.analysisWorker, E5_SMALL.dims);
+		return this.vectorIndex;
 	}
 
 	getCache(): EmbeddingCache {
