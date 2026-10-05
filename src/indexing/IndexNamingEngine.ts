@@ -108,7 +108,7 @@ export function suggestIndexName(input: NamingInput): IndexNameSuggestion {
 		for (const p of phrases(t)) {
 			if (seen.has(p.key)) continue;
 			seen.add(p.key);
-			const s = stats.get(p.key) ?? { titles: 0, weight: 0, forms: new Map(), bigram: p.words.length === 2 };
+			const s = stats.get(p.key) ?? { titles: 0, weight: 0, forms: new Map<string, { n: number; atStart: number }>(), bigram: p.words.length === 2 };
 			s.titles++;
 			s.weight += 1 / (1 + rank * 0.15); // central titles count more
 			const form = p.words.join(" ");

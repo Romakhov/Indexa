@@ -8,8 +8,8 @@ import type { ProposalSet } from "../indexing/types";
 import { nmi, purity } from "./metrics";
 
 function goldOf(fm: Record<string, unknown>): string | null {
-	const raw = fm["Zettel-link"];
-	const first = Array.isArray(raw) ? raw[0] : raw;
+	const raw: unknown = fm["Zettel-link"];
+	const first: unknown = Array.isArray(raw) ? (raw[0] as unknown) : raw;
 	const m = typeof first === "string" ? first.match(/\[\[([^\]|#]+)/) : null;
 	return m ? m[1].split("/").pop()!.trim() : null;
 }
@@ -59,7 +59,7 @@ function evaluate(set: ProposalSet, r: AnalysisResult) {
 export async function proposalsEval(_app: App, r: AnalysisResult, base: Parameters<typeof buildProposals>[3], cuts = [0.2, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6]) {
 	if (!r.proposalNotes || !r.communities || !r.keywords) throw new Error("Run Analyze vault first");
 	const sweep = [];
-	for (const minConfidence of cuts) sweep.push({ minConfidence, ...evaluate(await buildProposals(r.proposalNotes!, r.communities!, r.keywords!, { ...base, minConfidence }), r) });
+	for (const minConfidence of cuts) sweep.push({ minConfidence, ...evaluate(await buildProposals(r.proposalNotes, r.communities, r.keywords, { ...base, minConfidence }), r) });
 	return { sweep };
 }
 

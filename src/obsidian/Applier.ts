@@ -310,7 +310,7 @@ export class Applier {
 					await this.app.vault.create(o.path, o.content);
 				} else if (o.op === "mkdir") {
 					const f = this.app.vault.getFolderByPath(o.path);
-					if (f && f.children.length === 0) await this.app.vault.delete(f);
+					if (f && f.children.length === 0) await this.app.fileManager.trashFile(f);
 				}
 			} catch (e) {
 				errors.push({ path, message: message(e) });

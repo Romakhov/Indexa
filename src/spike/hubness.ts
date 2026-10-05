@@ -14,8 +14,8 @@ function norm(v: Float32Array) {
 
 function gold(app: App, path: string): string | null {
 	const f = app.vault.getFileByPath(path);
-	const raw = f ? app.metadataCache.getFileCache(f)?.frontmatter?.["Zettel-link"] : undefined;
-	const first = Array.isArray(raw) ? raw[0] : raw;
+	const raw: unknown = f ? app.metadataCache.getFileCache(f)?.frontmatter?.["Zettel-link"] : undefined;
+	const first: unknown = Array.isArray(raw) ? (raw[0] as unknown) : raw;
 	const m = typeof first === "string" ? first.match(/\[\[([^\]|#]+)/) : null;
 	return m ? m[1].split("/").pop()!.trim() : null;
 }
@@ -47,7 +47,7 @@ export function hubnessExperiment(app: App, result: AnalysisResult, cache: Embed
 	for (const [name, vs] of Object.entries(variants)) {
 		let agree = 0;
 		let total = 0;
-		const inDegree = new Array(vs.length).fill(0);
+		const inDegree = new Array<number>(vs.length).fill(0);
 		for (let i = 0; i < vs.length; i++) {
 			const sims = vs.map((v, j) => {
 				if (j === i) return -2;

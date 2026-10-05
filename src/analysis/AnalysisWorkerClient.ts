@@ -2,8 +2,9 @@ import type { NeighborTable } from "../vectors/NeighborTable";
 import type { VectorSearchResult } from "../vectors/VectorIndex";
 import type { AnalysisRequest, AnalysisResponse, ClusterResponse, IndexStats } from "./protocol";
 
-type Pending = { resolve: (v: any) => void; reject: (e: Error) => void; onProgress?: (done: number, total: number) => void };
-type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never;
+// method syntax: each request resolves with its own reply type
+type Pending = { resolve(v: unknown): void; reject: (e: Error) => void; onProgress?: (done: number, total: number) => void };
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /** Main-thread handle to the analysis worker. Started lazily, never in onload(). */
 export class AnalysisWorkerClient {

@@ -22,7 +22,7 @@ export class ReviewController {
 		const adapter = this.plugin.app.vault.adapter;
 		if (!(await adapter.exists(this.path))) return;
 		try {
-			const data = JSON.parse(await adapter.read(this.path));
+			const data = JSON.parse(await adapter.read(this.path)) as (Partial<ReviewState> & { version?: number }) | null;
 			if (data?.version === 1) this.state = { ...emptyReview(), ...data };
 		} catch (e) {
 			console.warn("[indexa] review state unreadable, starting fresh", e);

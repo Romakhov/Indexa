@@ -2,8 +2,9 @@ import type { EmbeddingProvider } from "./EmbeddingProvider";
 import type { ModelSpec, ModelStore } from "./ModelStore";
 import type { WorkerRequest, WorkerResponse } from "./worker/protocol";
 
-type Pending = { resolve: (v: any) => void; reject: (e: Error) => void };
-type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never;
+// method syntax: each request resolves with its own reply type
+type Pending = { resolve(v: unknown): void; reject: (e: Error) => void };
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /**
  * Runs the embedding model in a dedicated Web Worker so inference never blocks
@@ -75,9 +76,9 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
 		this.failAll(new Error("Embedding provider disposed"));
 	}
 
-	private request(msg: DistributiveOmit<WorkerRequest, "id">, transfer: Transferable[] = []): Promise<any> {
+	private request<R extends DistributiveOmit<WorkerRequest, "id">>(msg: R, transfer: Transferable[] = []): Promise<Extract<WorkerResponse, { type: R["type"] }>> {
 		const id = this.nextId++;
-		return new Promise((resolve, reject) => {
+		return new Promise<Extract<WorkerResponse, { type: R["type"] }>>((resolve, reject) => {
 			this.pending.set(id, { resolve, reject });
 			this.worker!.postMessage({ ...msg, id }, transfer);
 		});

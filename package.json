@@ -1,16 +1,19 @@
 {
   "name": "indexa",
   "version": "0.0.1",
-  "description": "Local self-organizing knowledge graph for Obsidian",
+  "description": "Organizes notes by meaning: local semantic analysis proposes index notes.",
   "main": "main.js",
   "scripts": {
-    "build": "tsc --noEmit -p . && vitest run && node esbuild.config.mjs --production",
+    "build": "tsc --noEmit -p . && vitest run && npm run lint && node esbuild.config.mjs --production",
     "build:dev": "node esbuild.config.mjs",
     "build:vault": "node scripts/build-vault.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "npx --prefix tools/review eslint --config tools/review/eslint.config.mjs --no-error-on-unmatched-pattern --max-warnings 0 .",
+    "review": "node scripts/review-check.mjs",
+    "postinstall": "npm --prefix tools/review install --no-audit --no-fund"
   },
   "keywords": [],
-  "author": "",
+  "author": "kdromahov",
   "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
@@ -27,7 +30,8 @@
     "@huggingface/transformers": "^4.3.0",
     "graphology": "^0.26.0",
     "graphology-communities-louvain": "^2.0.2",
-    "hnswlib-wasm-core": "^0.9.1"
+    "hnswlib-wasm-core": "^0.9.1",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0"
   },
   "private": true,
   "sideEffects": [

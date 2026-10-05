@@ -9,13 +9,32 @@
 // slower in this build (0.1 ms -> 128 ms per query at 2k vectors). The adapter
 // never resizes a non-empty index; it rebuilds into a doubled capacity instead.
 
-import { loadHnswlib, type HnswlibModule } from "hnswlib-wasm-core";
+import { loadHnswlib as loadUntyped } from "hnswlib-wasm-core";
 import { timeSlicer } from "../core/yieldToUi";
 import type { BinaryStore } from "../storage/BinaryStore";
 import type { VectorIndex, VectorSearchResult } from "./VectorIndex";
 
-type Hnsw = InstanceType<HnswlibModule["HierarchicalNSW"]>;
-type VecF = InstanceType<HnswlibModule["VectorFloat"]>;
+// The package's .d.ts imports a file it does not ship, so its types resolve to
+// nothing. This is the subset of the emscripten bindings the adapter uses.
+interface VecF {
+	resize(n: number, fill: number): void;
+	set(i: number, v: number): void;
+	delete(): void;
+}
+interface Hnsw {
+	initIndex(maxElements: number, m: number, efConstruction: number, seed: number): void;
+	setEfSearch(ef: number): void;
+	getMaxElements(): number;
+	addPoint(point: VecF, label: number, replaceDeleted: boolean): void;
+	markDelete(label: number): void;
+	searchKnn(query: VecF, k: number, filter: undefined): { neighbors: number[]; distances: number[] };
+	delete(): void;
+}
+interface HnswlibModule {
+	HierarchicalNSW: new (space: "ip" | "l2" | "cosine", dims: number) => Hnsw;
+	VectorFloat: new () => VecF;
+}
+const loadHnswlib = loadUntyped as unknown as () => Promise<HnswlibModule>;
 
 export interface HnswParams {
 	m: number;
@@ -64,7 +83,7 @@ export class HnswVectorIndex implements VectorIndex {
 	async initialize(dimensions: number, capacity = this.params.initialCapacity) {
 		this.lib ??= await loadHnswlib();
 		this.dims = dimensions;
-		this.index?.delete?.();
+		this.index?.delete();
 		this.index = this.create();
 		this.index.initIndex(Math.max(capacity, 16), this.params.m, this.params.efConstruction, this.params.seed);
 		this.index.setEfSearch(this.params.efSearch);

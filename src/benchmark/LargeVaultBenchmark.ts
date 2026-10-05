@@ -9,7 +9,7 @@ import { MainView } from "../ui/MainView";
 
 const PARTS: Record<number, string[]> = { 500: ["p1"], 2000: ["p1", "p2"], 5000: ["p1", "p2", "p3"], 10000: ["p1", "p2", "p3", "p4"] };
 const ALL_PARTS = ["p1", "p2", "p3", "p4"];
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
 
 /** Obsidian's internal plugin manager (dev-only use: reload the plugin to measure startup). */
 export function pluginManager(app: IndexaPlugin["app"]) {
@@ -17,7 +17,7 @@ export function pluginManager(app: IndexaPlugin["app"]) {
 }
 
 async function memoryMb(): Promise<number | null> {
-	const proc = (globalThis as { process?: { getProcessMemoryInfo?: () => Promise<{ private: number }> } }).process;
+	const proc = (window as unknown as { process?: { getProcessMemoryInfo?: () => Promise<{ private: number }> } }).process;
 	return proc?.getProcessMemoryInfo ? Math.round((await proc.getProcessMemoryInfo()).private / 1024) : null;
 }
 
@@ -152,12 +152,12 @@ export async function largeVaultBenchmark(plugin: IndexaPlugin, o: LargeVaultOpt
 			// incremental: one new note → suggestion, without re-analysis (spec §94)
 			const path = `${PARTS[size][0]}/bench-incremental-${size}.md`;
 			const existing = plugin.app.vault.getFileByPath(path);
-			if (existing) await plugin.app.vault.delete(existing);
+			if (existing) await plugin.app.fileManager.trashFile(existing);
 			const f = await plugin.app.vault.create(path, "# Чёрная дыра в центре галактики\n\nСверхмассивная чёрная дыра в центре Млечного Пути имеет массу около четырёх миллионов солнечных масс; её окружает аккреционный диск, а звёзды вокруг неё движутся по вытянутым орбитам.\n");
 			const ti = performance.now();
 			const ir = await plugin.incremental.runNow(f);
 			row.incremental = { status: ir.status, processingMs: ir.ms, wallMs: Math.round(performance.now() - ti), suggestions: ir.suggestions?.length ?? 0 };
-			await plugin.app.vault.delete(f);
+			await plugin.app.fileManager.trashFile(f);
 
 			// startup: reload the plugin with this vault's stored state
 			const ts = performance.now();
@@ -169,7 +169,7 @@ export async function largeVaultBenchmark(plugin: IndexaPlugin, o: LargeVaultOpt
 			row.storedRestoredMs = Math.round(performance.now() - ts);
 			row.memoryAfterMb = await memoryMb();
 			results.push(row);
-			console.log("[indexa bench]", row);
+			console.debug("[indexa bench]", row);
 		}
 
 		if (o.applyUndo) {

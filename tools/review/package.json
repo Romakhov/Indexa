@@ -1,0 +1,10 @@
+{
+  "name": "indexa-review-tools",
+  "private": true,
+  "description": "Pinned copy of the Obsidian community scanner lint toolchain (obsidianmd/obsidian-workflows v1.2.3). Kept apart from the plugin's own dependencies, like the scanner does.",
+  "devDependencies": {
+    "eslint": "9.37.0",
+    "eslint-plugin-obsidianmd": "0.4.1",
+    "typescript-eslint": "8.61.1"
+  }
+}

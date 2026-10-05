@@ -137,7 +137,7 @@ export async function embedNotes(
 				const { note, part } = batch[k];
 				if (part < 0) heads.set(note, vectors[k]);
 				else {
-					const arr = chunkVecs.get(note) ?? new Array(notes[note].chunks.length);
+					const arr = chunkVecs.get(note) ?? new Array<Float32Array>(notes[note].chunks.length);
 					arr[part] = vectors[k];
 					chunkVecs.set(note, arr);
 				}

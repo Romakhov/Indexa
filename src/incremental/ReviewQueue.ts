@@ -25,7 +25,7 @@ export class ReviewQueue {
 	async load() {
 		if (!(await this.adapter.exists(this.path))) return;
 		try {
-			this.items = JSON.parse(await this.adapter.read(this.path)).items ?? [];
+			this.items = (JSON.parse(await this.adapter.read(this.path)) as { items?: QueueItem[] }).items ?? [];
 		} catch {
 			this.items = [];
 		}

@@ -85,9 +85,14 @@ export default class IndexaPlugin extends Plugin {
 		this.onloadMs = performance.now() - t0;
 	}
 
-	async onunload() {
+	onunload() {
 		this.analysis?.abort();
 		this.incremental?.dispose();
+		// Obsidian does not await onunload(): save and stop the workers in the background
+		void this.shutdown();
+	}
+
+	private async shutdown() {
 		await this.saveNoteIds();
 		await this.provider?.dispose();
 		await this.disposePool();

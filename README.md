@@ -19,6 +19,7 @@ and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Wo
 | 7 — apply + undo: index notes, zk-indexes, change journal, stacked undo | done |
 | 8 — incremental mode: new / changed / renamed / deleted notes, review queue | done |
 | 9 — large-vault stabilisation: 500 / 2k / 5k / 10k benchmarks, fixes from measurements | done |
+| Gate R — Obsidian review compatibility: scanner lint + bundle preflight in build and CI | done — [`reports/review-check.md`](reports/review-check.md) |
 
 What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
 progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache,
@@ -50,6 +51,7 @@ run "Download local semantic model"**.
 
 The model is kept outside the vault so it is shared between vaults and is not copied by vault sync.
 The ONNX Runtime WebAssembly binary is bundled inside `main.js`; nothing is loaded from a CDN.
+No executable code is ever downloaded: the model download contains weights, tokenizer and config files only.
 Embeddings are cached in the plugin folder (`cache/`, a few MB per thousand notes); vectors are never written into notes.
 Inference runs in a Web Worker in which all `fetch`/XHR/`importScripts` calls are blocked.
 
@@ -58,7 +60,9 @@ Inference runs in a Web Worker in which all `fetch`/XHR/`importScripts` calls ar
 ```bash
 npm install
 npm test              # unit tests (vitest)
-npm run build         # typecheck + tests + release main.js
+npm run build         # typecheck + tests + scanner lint + release main.js
+npm run lint          # Obsidian community scanner ESLint rules (pinned copy in tools/review)
+npm run review        # Obsidian's review action, run locally against the source and the built main.js
 npm run build:vault   # dev build with spike commands into dev-vault/.obsidian/plugins/indexa
 ```
 
@@ -166,3 +170,34 @@ Measured and fixed in this phase: note-id → path lookup was linear (Review rec
 at 10k); classification, keyword extraction and graph features now yield to the UI; scoring no longer
 allocates an object per (note, index) pair; the model-installed check is cached. Longest main-thread
 pause during a 10k analysis: 802 ms → 330 ms (remaining pauses are garbage collection).
+
+## Obsidian review compatibility (Gate R)
+
+Since May 2026 the community directory scans every release automatically: the source with the
+`eslint-plugin-obsidianmd` scanner rules and Stylelint, and the published `main.js` with bundle checks.
+The same checks run here on every build and push:
+
+- `npm run lint` uses a pinned copy of the scanner's ESLint setup (`tools/review/`, mirrored from
+  [obsidianmd/obsidian-workflows](https://github.com/obsidianmd/obsidian-workflows) v1.2.3) with zero warnings allowed;
+- `npm run review` runs that action itself locally, in scanner mode, against the built bundle;
+- `.github/workflows/review.yml` runs it on GitHub for every push.
+
+Current result: **0 errors**, scanner ESLint and Stylelint clean. Remaining bundle findings, both expected and explained:
+
+| Finding | Severity | Why it is there |
+|---|---|---|
+| `bundle-inline-wasm` | warning (advisory) | `onnxruntime-web` 1.31.0-dev.20260914-8d85527a0 `ort-wasm-simd-threaded.wasm`, unmodified, embedded as base64 so no code is fetched at runtime. Verifiable: the build prints its size and the bytes are the npm package's file. |
+| `bundle-wasm-reference` | recommendation | file-name strings inside the ONNX Runtime glue code; with `wasmBinary` set they are never fetched (the worker blocks all network access). |
+
+The alternative to the embedded WASM — downloading it next to the model — was rejected: it would move
+executable code out of the reviewed bundle and into a runtime download, which is what the developer policies forbid.
+Re-encoding the binary to hide it from the detector would be obfuscation and is not done either.
+
+### Bundled third-party components
+
+| Component | Licence | Use |
+|---|---|---|
+| [@huggingface/transformers](https://github.com/huggingface/transformers.js) | Apache-2.0 | tokenizer + inference pipeline (embedding worker) |
+| [onnxruntime-web](https://github.com/microsoft/onnxruntime) (incl. its WASM binary) | MIT | model execution on the CPU |
+| [hnswlib-wasm-core](https://www.npmjs.com/package/hnswlib-wasm-core) | Apache-2.0 | approximate nearest-neighbour index (analysis worker) |
+| [graphology](https://graphology.github.io/), graphology-communities-louvain | MIT | similarity graph, Louvain communities |

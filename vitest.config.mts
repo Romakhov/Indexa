@@ -8,5 +8,5 @@ export default defineConfig({
 			"hnswlib-wasm-core": fileURLToPath(new URL("./node_modules/hnswlib-wasm-core/dist/hnswlib.js", import.meta.url)),
 		},
 	},
-	test: { include: ["tests/**/*.test.ts"] },
+	test: { include: ["tests/**/*.test.ts"], setupFiles: ["tests/setup.ts"] },
 });

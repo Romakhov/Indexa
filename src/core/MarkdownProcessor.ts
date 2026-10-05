@@ -23,7 +23,7 @@ const TABLE_SEP = /^\s*\|?\s*:?-{2,}.*$/gm;
 const HEADING = /^#{1,6}\s+(.*)$/gm;
 const DATAVIEW_FIELD = /^\s*[\p{L}\w-]+::.*$/gmu;
 const INLINE_TAG = /(^|\s)#[\p{L}\w/-]+/gu;
-const WHITESPACE = /[\t  -​ 　 ]+/g;
+const WHITESPACE = /[\t\u00A0\u2000-\u200B\u202F\u3000 ]+/g;
 
 /** Low-content threshold: fewer own characters than this → not placed semantically. */
 export const LOW_CONTENT_CHARS = 40;

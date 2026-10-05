@@ -2,7 +2,7 @@
 
 /** Per-key debounce: many calls for one key within `delayMs` collapse into one. */
 export class KeyedDebouncer<K> {
-	private timers = new Map<K, ReturnType<typeof setTimeout>>();
+	private timers = new Map<K, number>();
 
 	constructor(
 		private delayMs: number,
@@ -15,10 +15,10 @@ export class KeyedDebouncer<K> {
 
 	trigger(key: K) {
 		const t = this.timers.get(key);
-		if (t !== undefined) clearTimeout(t);
+		if (t !== undefined) window.clearTimeout(t);
 		this.timers.set(
 			key,
-			setTimeout(() => {
+			window.setTimeout(() => {
 				this.timers.delete(key);
 				this.fire(key);
 			}, this.delayMs),
@@ -27,12 +27,12 @@ export class KeyedDebouncer<K> {
 
 	cancel(key: K) {
 		const t = this.timers.get(key);
-		if (t !== undefined) clearTimeout(t);
+		if (t !== undefined) window.clearTimeout(t);
 		this.timers.delete(key);
 	}
 
 	cancelAll() {
-		for (const t of this.timers.values()) clearTimeout(t);
+		for (const t of this.timers.values()) window.clearTimeout(t);
 		this.timers.clear();
 	}
 

@@ -15,7 +15,7 @@ const ctx = self as unknown as DedicatedWorkerGlobalScope;
 // none of Node, so hide it before any library is evaluated.
 for (const name of ["process", "require", "module", "global", "Buffer"]) {
 	try {
-		Object.defineProperty(globalThis, name, { value: undefined, configurable: true, writable: true });
+		Object.defineProperty(ctx, name, { value: undefined, configurable: true, writable: true });
 	} catch {
 		/* non-configurable: leave as is, checked in init() */
 	}
@@ -51,13 +51,15 @@ const guardedFetch = async (input: RequestInfo | URL): Promise<Response> => {
 };
 
 // Install the guard before transformers.js / ORT are evaluated.
-(ctx as any).fetch = guardedFetch;
-(ctx as any).importScripts = (...urls: string[]) => blocked(urls.join(", "));
-(ctx as any).XMLHttpRequest = class {
-	open(_m: string, url: string) {
-		blocked(url);
-	}
-};
+Object.assign(ctx, {
+	fetch: guardedFetch,
+	importScripts: (...urls: string[]) => blocked(urls.join(", ")),
+	XMLHttpRequest: class {
+		open(_m: string, url: string) {
+			blocked(url);
+		}
+	},
+});
 
 // transformers.js is loaded lazily in init(), i.e. strictly after the guard
 // above is installed. The wasm import below is just embedded bytes.
@@ -72,7 +74,7 @@ async function init(modelId: string, dtype: string, files: Record<string, ArrayB
 	modelFiles = new Map(Object.entries(files));
 	modelRoot = `${LOCAL_ROOT}${modelId}/`;
 
-	if (typeof (globalThis as any).process !== "undefined") throw new Error("Node globals could not be hidden in the worker");
+	if ((ctx as unknown as Record<string, unknown>).process !== undefined) throw new Error("Node globals could not be hidden in the worker");
 	const { env, pipeline } = await import("@huggingface/transformers");
 	env.allowRemoteModels = false;
 	env.allowLocalModels = true;
@@ -81,7 +83,7 @@ async function init(modelId: string, dtype: string, files: Record<string, ArrayB
 	env.useFSCache = false;
 	env.useWasmCache = false;
 	env.useFS = false;
-	env.fetch = guardedFetch as typeof fetch;
+	env.fetch = guardedFetch;
 
 	// transformers.js shallow-copies the ORT env into env.backends.onnx and the
 	// `wasm` section is lost, so configure ORT's own env. The build aliases
@@ -92,9 +94,11 @@ async function init(modelId: string, dtype: string, files: Record<string, ArrayB
 	ort.env.wasm.numThreads = 1; // Obsidian is not cross-origin isolated: no SharedArrayBuffer
 	ort.env.wasm.proxy = false;
 
-	extractor = (await pipeline("feature-extraction", modelId, { device, dtype: dtype as any })) as any;
+	// transformers' overloads for pipeline() are too wide to infer here; this is the shape we use
+	const createPipeline = pipeline as unknown as (task: "feature-extraction", model: string, opts: { device: string; dtype: string }) => Promise<NonNullable<typeof extractor>>;
+	extractor = await createPipeline("feature-extraction", modelId, { device, dtype });
 	modelFiles.clear(); // the session holds its own copy now
-	const probe = await extractor!(["probe"], { pooling: "mean", normalize: true });
+	const probe = await extractor(["probe"], { pooling: "mean", normalize: true });
 	dimensions = probe.dims[probe.dims.length - 1];
 	return { loadMs: performance.now() - t0, backend: device === "webgpu" ? "webgpu" : "wasm-cpu" };
 }

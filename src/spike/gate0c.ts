@@ -77,8 +77,8 @@ interface NoteRow {
 
 function goldLabel(app: App, file: TFile): string | null {
 	const fm = app.metadataCache.getFileCache(file)?.frontmatter;
-	const raw = fm?.["Zettel-link"];
-	const first = Array.isArray(raw) ? raw[0] : raw;
+	const raw: unknown = fm?.["Zettel-link"];
+	const first: unknown = Array.isArray(raw) ? (raw[0] as unknown) : raw;
 	if (typeof first !== "string") return null;
 	const m = first.match(/\[\[([^\]|#]+)/);
 	return m ? m[1].split("/").pop()!.trim() : null;
@@ -178,7 +178,7 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 	await provider.initialize();
 	const cache = new SpikeEmbeddingCache(store, provider.dimensions);
 	await cache.load();
-	const vectors: Float32Array[] = new Array(rows.length);
+	const vectors: Float32Array[] = new Array<Float32Array>(rows.length);
 	const misses: number[] = [];
 	rows.forEach((r, i) => {
 		const v = cache.get(cache.key(r.file.path, r.text));

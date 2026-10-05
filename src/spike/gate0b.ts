@@ -11,7 +11,7 @@ import type { BinaryStore } from "../storage/BinaryStore";
 import { BruteForceVectorIndex } from "../vectors/BruteForceVectorIndex";
 import { HnswVectorIndex } from "../vectors/HnswVectorIndex";
 import type { VectorSearchResult } from "../vectors/VectorIndex";
-import { nmi, purity } from "./metrics";
+import { heapMb, nmi, purity } from "./metrics";
 import { stallMonitor } from "./stall";
 import { timeSlicer } from "../core/yieldToUi";
 
@@ -97,7 +97,7 @@ async function runSize(
 	lap("readMs");
 
 	// 2. embed (cache first; misses batched, length-sorted to reduce padding)
-	const vectors: Float32Array[] = new Array(items.length);
+	const vectors: Float32Array[] = new Array<Float32Array>(items.length);
 	const misses: number[] = [];
 	items.forEach((it, i) => {
 		const v = cache.get(cache.key(it.file, texts[i]));
@@ -314,7 +314,7 @@ export async function runGate0b(app: App, provider: LocalEmbeddingProvider, stor
 			entries: stall.entries.map((e) => ({ ...e, stage: stages.find((st) => e.start >= st.start - 1 && e.start <= st.end)?.name ?? "other" })),
 		},
 		blockedRequests: provider.blockedRequests,
-		memory: (performance as any).memory ? { usedJSHeapMB: Math.round((performance as any).memory.usedJSHeapSize / 1048576) } : undefined,
+		memory: heapMb(),
 		results,
 		scale,
 	};

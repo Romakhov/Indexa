@@ -13,7 +13,7 @@ import { PooledEmbeddingProvider } from "../embeddings/PooledEmbeddingProvider";
 
 async function rendererMemoryMb(): Promise<number | null> {
 	// Electron: workers are threads of the renderer process, so this includes them
-	const proc = (globalThis as { process?: { getProcessMemoryInfo?: () => Promise<{ private: number }> } }).process;
+	const proc = (window as unknown as { process?: { getProcessMemoryInfo?: () => Promise<{ private: number }> } }).process;
 	if (!proc?.getProcessMemoryInfo) return null;
 	return Math.round((await proc.getProcessMemoryInfo()).private / 1024);
 }

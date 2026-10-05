@@ -25,7 +25,7 @@ export function registerSpikeCommands(plugin: IndexaPlugin) {
 		const dir = `${plugin.manifest.dir}/reports`;
 		if (!(await plugin.app.vault.adapter.exists(dir))) await plugin.app.vault.adapter.mkdir(dir);
 		await plugin.app.vault.adapter.write(`${dir}/${name}`, JSON.stringify(report, null, 2));
-		console.log(`[indexa] ${name}`, report);
+		console.debug(`[indexa] ${name}`, report);
 	};
 
 	const spike = {
@@ -79,8 +79,8 @@ export function registerSpikeCommands(plugin: IndexaPlugin) {
 				r.notes.forEach((n) => topic.has(n.path) && labels.set(n.id, topic.get(n.path)!));
 			} else {
 				for (const n of r.notes) {
-					const raw = n.frontmatter["Zettel-link"];
-					const first = Array.isArray(raw) ? raw[0] : raw;
+					const raw: unknown = n.frontmatter["Zettel-link"];
+					const first: unknown = Array.isArray(raw) ? (raw[0] as unknown) : raw;
 					const m = typeof first === "string" ? first.match(/\[\[([^\]|#]+)/) : null;
 					if (m) labels.set(n.id, m[1].split("/").pop()!.trim());
 				}

@@ -31,3 +31,9 @@ export function purity(labels: string[], clusters: number[]): number {
 	for (const m of byCluster.values()) hit += Math.max(...m.values());
 	return hit / labels.length;
 }
+
+/** Chromium-only JS heap size, for spike reports. */
+export function heapMb(): { usedJSHeapMB: number } | undefined {
+	const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
+	return memory ? { usedJSHeapMB: Math.round(memory.usedJSHeapSize / 1048576) } : undefined;
+}

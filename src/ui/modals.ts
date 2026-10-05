@@ -42,7 +42,7 @@ export class RenameModal extends Modal {
 		new Setting(contentEl)
 			.addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()))
 			.addButton((b) => b.setButtonText("Save").setCta().onClick(() => this.submit()));
-		window.setTimeout(() => (input as HTMLInputElement | null)?.focus(), 0);
+		window.setTimeout(() => input?.focus(), 0);
 	}
 
 	private submit() {

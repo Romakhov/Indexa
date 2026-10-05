@@ -5,6 +5,7 @@
 import { cosine } from "../embeddings/EmbeddingProvider";
 import type { LocalEmbeddingProvider } from "../embeddings/LocalEmbeddingProvider";
 import { stallMonitor } from "./stall";
+import { heapMb } from "./metrics";
 
 const PAIRS = {
 	ru: {
@@ -83,9 +84,7 @@ export async function runGate0a(provider: LocalEmbeddingProvider, extra: Record<
 		singleVsBatch: +singleVsBatch.toFixed(6),
 		mainThreadLongTasks: stall,
 		blockedRequests: provider.blockedRequests,
-		memory: (performance as any).memory
-			? { usedJSHeapMB: Math.round((performance as any).memory.usedJSHeapSize / 1048576) }
-			: undefined,
+		memory: heapMb(),
 		...extra,
 	};
 }

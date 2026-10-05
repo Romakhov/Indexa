@@ -69,7 +69,7 @@ export class ModelStore {
 		const out: Record<string, ArrayBuffer> = {};
 		for (const file of spec.files) {
 			const buf = await fs.promises.readFile(path.join(this.dir(spec), file));
-			out[file] = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+			out[file] = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 		}
 		return out;
 	}

@@ -21,7 +21,7 @@ export class IndexaSettingTab extends PluginSettingTab {
 
 	async setControlValue(key: string, value: unknown): Promise<void> {
 		const v = LIST_KEYS.has(key as Key) ? String(value).split("\n") : value;
-		await this.plugin.updateSettings({ [key]: v } as Partial<IndexaSettings>);
+		await this.plugin.updateSettings({ [key]: v });
 		if (key === "showAdvanced" || key === "moveNotesAfterApply") this.refreshDomState();
 	}
 

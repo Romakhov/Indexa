@@ -16,15 +16,17 @@ const post = (msg: AnalysisResponse, transfer: Transferable[] = []) => ctx.postM
 // Obsidian enables Node in workers; nothing here needs it.
 for (const name of ["process", "require", "module", "global", "Buffer"]) {
 	try {
-		Object.defineProperty(globalThis, name, { value: undefined, configurable: true, writable: true });
+		Object.defineProperty(ctx, name, { value: undefined, configurable: true, writable: true });
 	} catch {
 		/* ignore */
 	}
 }
 for (const name of ["fetch", "importScripts", "XMLHttpRequest"]) {
-	(ctx as any)[name] = () => {
-		throw new Error(`Network access is disabled in the analysis worker (${name})`);
-	};
+	Object.assign(ctx, {
+		[name]: () => {
+			throw new Error(`Network access is disabled in the analysis worker (${name})`);
+		},
+	});
 }
 
 /** The index is rebuilt from the embedding cache, so it never persists itself. */

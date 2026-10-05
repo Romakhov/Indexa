@@ -340,6 +340,8 @@ export class AnalysisRunner {
 			}
 		}
 
+		// assigned inside report(); flow analysis cannot see that and narrows it to null
+		const last = current as Stage | null;
 		return {
 			notes,
 			processed,
@@ -368,7 +370,7 @@ export class AnalysisRunner {
 				templateLines: templates.size,
 				errors,
 				durationMs: Math.round(performance.now() - t0),
-				stageMs: current ? { ...stageMs, [current]: Math.round((stageMs[current] ?? 0) + performance.now() - stageStart) } : stageMs,
+				stageMs: last ? { ...stageMs, [last]: Math.round((stageMs[last] ?? 0) + performance.now() - stageStart) } : stageMs,
 			},
 		};
 	}
