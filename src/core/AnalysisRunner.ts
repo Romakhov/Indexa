@@ -8,7 +8,10 @@ import type { EmbeddingProvider } from "../embeddings/EmbeddingProvider";
 import { EmbeddingCancelled, embedNotes, type NoteToEmbed } from "../embeddings/NoteEmbedder";
 import type { EdgeWeights } from "../graph/HybridEdgeScorer";
 import { buildNoteFeatures } from "../graph/features";
+import { buildProposals, type ProposalNote } from "../indexing/IndexProposalEngine";
+import type { ProposalSet } from "../indexing/types";
 import { KeywordExtractor } from "../keywords/KeywordExtractor";
+import { neighborsOf } from "../vectors/NeighborTable";
 import type { NeighborTable } from "../vectors/NeighborTable";
 import type { VectorIndexService } from "../vectors/VectorIndexService";
 import { bodyLines, processNote } from "./MarkdownProcessor";
@@ -54,6 +57,12 @@ export interface AnalysisSummary {
 		knnMs: number;
 		k: number;
 	};
+	proposals?: {
+		topics: number;
+		collections: number;
+		unclassified: number;
+		multiIndexNotes: number;
+	};
 	communities?: {
 		count: number;
 		/** communities with at least minNotes members (index candidates) */
@@ -85,6 +94,14 @@ export interface ClusteringDeps {
 	resolution: number;
 	weights: EdgeWeights;
 	refineMaxShare: number | null;
+	proposals: {
+		minNotes: number;
+		maxIndexesPerNote: number;
+		/** 0–1 member confidence needed to stay in an index */
+		minConfidence: number;
+		/** titles of notes already in the index folder */
+		existingIndexNames: string[];
+	};
 }
 
 export interface AnalysisResult {
@@ -97,6 +114,10 @@ export interface AnalysisResult {
 	/** community per note id (Phase 4); notes with little own text are not clustered */
 	communities?: Map<string, number>;
 	keywords?: KeywordExtractor;
+	/** Phase 5: index proposals (preview only, nothing applied) */
+	proposals?: ProposalSet;
+	/** inputs of the proposal engine, kept in memory for re-runs (detail/threshold changes, benchmarks) */
+	proposalNotes?: ProposalNote[];
 }
 
 export class AnalysisCancelled extends Error {
@@ -168,6 +189,8 @@ export class AnalysisRunner {
 		let communities: Map<string, number> | undefined;
 		let keywords: KeywordExtractor | undefined;
 		let communitySummary: AnalysisSummary["communities"];
+		let proposalSet: ProposalSet | undefined;
+		let proposalNotesOut: ProposalNote[] | undefined;
 		if (this.embedding) {
 			const { provider, cache, parallel } = this.embedding;
 			const toEmbed: NoteToEmbed[] = [];
@@ -268,6 +291,31 @@ export class AnalysisRunner {
 						ms: res.ms + res.knnMs,
 					};
 					report("Detecting communities", 1, 1);
+
+					check();
+					report("Building proposals", 0, 1);
+					const index = this.embedding.index;
+					const rowNeighbors = new Map(neighbors.ids.map((id, i) => [id, neighborsOf(neighbors!, i).map((n) => n.id)]));
+					const proposalNotes: ProposalNote[] = processed.map((p, i) => {
+						const n = notes[i];
+						const entry = cache.peek(p.noteId);
+						const vector = !p.lowContent && entry ? (index.centre(entry.documentVector) ?? undefined) : undefined;
+						return {
+							id: p.noteId,
+							path: n.path,
+							title: n.title,
+							tags: n.tags,
+							frontmatter: n.frontmatter,
+							lowContent: p.lowContent,
+							vector,
+							chunks: vector ? entry?.chunks?.map((c) => ({ heading: c.heading, vector: index.centre(c.vector)! })) : undefined,
+							neighbors: rowNeighbors.get(p.noteId) ?? [],
+						};
+					});
+					await maybeYield();
+					proposalSet = buildProposals(proposalNotes, communities, keywords, clustering.proposals);
+					proposalNotesOut = proposalNotes;
+					report("Building proposals", 1, 1);
 				}
 			}
 		}
@@ -279,7 +327,15 @@ export class AnalysisRunner {
 			neighbors,
 			communities,
 			keywords,
+			proposals: proposalSet,
+			proposalNotes: proposalNotesOut,
 			summary: {
+				proposals: proposalSet && {
+					topics: proposalSet.proposals.filter((p) => p.kind === "topic").length,
+					collections: proposalSet.stats.collections,
+					unclassified: proposalSet.unclassified.length,
+					multiIndexNotes: proposalSet.stats.multiIndexNotes,
+				},
 				communities: communitySummary,
 				embedding: embeddingSummary,
 				vectorIndex: vectorIndexSummary,

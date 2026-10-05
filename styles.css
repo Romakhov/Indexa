@@ -96,3 +96,38 @@
 	align-items: flex-start;
 	gap: var(--size-4-2);
 }
+
+.indexa-index-list {
+	display: flex;
+	flex-direction: column;
+}
+
+.indexa-index-head {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--size-4-2);
+	font-weight: var(--font-semibold);
+}
+
+.indexa-index-name.is-unnamed {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.indexa-index-count {
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.indexa-keywords {
+	font-size: var(--font-ui-small);
+	margin: var(--size-4-1) 0;
+}
+
+.indexa-samples {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-1) var(--size-4-3);
+	font-size: var(--font-ui-small);
+	margin-top: var(--size-4-1);
+}

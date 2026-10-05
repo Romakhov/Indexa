@@ -2,6 +2,8 @@ import { debounce, Notice, Plugin, TFile } from "obsidian";
 import { AnalysisWorkerClient } from "./analysis/AnalysisWorkerClient";
 import { AnalysisCancelled, AnalysisRunner, type AnalysisResult, type AnalysisSummary } from "./core/AnalysisRunner";
 import { resolutionForDetail } from "./clustering/clusterNotes";
+import { confidenceForThreshold } from "./indexing/IndexClassifier";
+import { AnalysisStore, type StoredAnalysis } from "./storage/AnalysisStore";
 import { VectorIndexService } from "./vectors/VectorIndexService";
 import { NoteIdRegistry } from "./core/NoteIdRegistry";
 import { ObsidianVaultScanner } from "./core/VaultScanner";
@@ -27,6 +29,8 @@ export default class IndexaPlugin extends Plugin {
 	lastSummary: AnalysisSummary | null = null;
 	/** in memory only; proposals built from it arrive in Phase 4–5 */
 	lastResult: AnalysisResult | null = null;
+	/** latest proposals; survives restarts through AnalysisStore */
+	stored: StoredAnalysis | null = null;
 
 	private noteIds = new NoteIdRegistry();
 	private provider: LocalEmbeddingProvider | null = null;
@@ -68,6 +72,8 @@ export default class IndexaPlugin extends Plugin {
 
 	private async onLayoutReady() {
 		await this.loadNoteIds();
+		this.stored = await this.analysisStore().load();
+		this.views().forEach((v) => v.render());
 		this.registerEvent(
 			this.app.vault.on("rename", (file, oldPath) => {
 				if (file instanceof TFile) {
@@ -168,6 +174,15 @@ export default class IndexaPlugin extends Plugin {
 						resolution: resolutionForDetail(this.settings.detailLevel),
 						weights: this.settings.edgeWeights,
 						refineMaxShare: 0.15,
+						proposals: {
+							minNotes: this.settings.minNotesPerIndex,
+							maxIndexesPerNote: this.settings.maxIndexesPerNote,
+							minConfidence: confidenceForThreshold(this.settings.semanticThreshold),
+							existingIndexNames: this.app.vault
+								.getMarkdownFiles()
+								.filter((f) => f.path.startsWith(this.settings.indexFolder + "/"))
+								.map((f) => f.basename),
+						},
 					},
 				}
 			: undefined;
@@ -176,6 +191,10 @@ export default class IndexaPlugin extends Plugin {
 			const result = await new AnalysisRunner(scanner, embedding).run((p) => this.views().forEach((v) => v.setProgress(p)), controller.signal);
 			this.lastSummary = result.summary;
 			this.lastResult = result;
+			if (result.proposals) {
+				this.stored = { version: 1, proposals: result.proposals, paths: Object.fromEntries(result.notes.map((n) => [n.id, n.path])) };
+				await this.analysisStore().save(this.stored);
+			}
 			await this.saveNoteIds();
 		} catch (e) {
 			if (e instanceof AnalysisCancelled) new Notice("Analysis cancelled. Nothing in your vault was changed.");
@@ -226,6 +245,10 @@ export default class IndexaPlugin extends Plugin {
 		const p = this.pool;
 		this.pool = null;
 		await p?.dispose();
+	}
+
+	analysisStore() {
+		return new AnalysisStore(this.app.vault.adapter, `${this.manifest.dir}/analysis.json`);
 	}
 
 	getVectorIndex(): VectorIndexService {

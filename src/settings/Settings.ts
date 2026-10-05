@@ -57,7 +57,7 @@ export const DEFAULT_SETTINGS: IndexaSettings = {
 	minNotesPerIndex: 3,
 	maxIndexesPerNote: 3,
 	showAdvanced: false,
-	semanticThreshold: 50,
+	semanticThreshold: 25,
 	topK: 15,
 	embeddingWorkers: 2,
 	edgeWeights: { ...DEFAULT_EDGE_WEIGHTS },

@@ -1,0 +1,17 @@
+{
+  "sweep": [
+    {
+      "minConfidence": 0.3,
+      "topics": 19,
+      "collections": 2,
+      "coverage": 0.774,
+      "unclassifiedContent": 81,
+      "purity": 0.585,
+      "nmi": 0.749,
+      "rawRightAmongKept": 0.585,
+      "rawRightAmongUnclassified": 0.25,
+      "multiIndexNotes": 27,
+      "named": 21
+    }
+  ]
+}

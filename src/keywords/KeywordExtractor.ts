@@ -28,11 +28,17 @@ export class KeywordExtractor {
 	private tf = new Map<string, Map<string, number>>();
 	private df = new Map<string, number>();
 	private surface = new Map<string, Map<string, number>>();
+	/** lower-case word -> how often it was written in capitals (acronyms like ВВП, API) */
+	private upper = new Map<string, number>();
 	private readonly docCount: number;
 
 	constructor(docs: KeywordDoc[]) {
 		this.docCount = docs.length;
 		for (const d of docs) {
+			for (const w of d.text.match(/\p{Lu}[\p{Lu}\d-]{1,}/gu) ?? []) {
+				const l = w.toLowerCase().replace(/ё/g, "е");
+				this.upper.set(l, (this.upper.get(l) ?? 0) + 1);
+			}
 			const counts = new Map<string, number>();
 			for (const t of tokenize(d.text)) {
 				const s = stem(t);
@@ -85,6 +91,9 @@ export class KeywordExtractor {
 
 	readable(s: string): string {
 		const sf = this.surface.get(s);
-		return sf ? [...sf].sort((a, b) => b[1] - a[1])[0][0] : s;
+		if (!sf) return s;
+		const [word, n] = [...sf].sort((a, b) => b[1] - a[1])[0];
+		// mostly written in capitals → an acronym: keep it that way
+		return (this.upper.get(word) ?? 0) * 2 >= n ? word.toUpperCase() : word;
 	}
 }

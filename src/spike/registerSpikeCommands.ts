@@ -15,6 +15,7 @@ import { runGate0c, type Gate0cOptions } from "./gate0c";
 import { hubnessExperiment } from "./hubness";
 import { indexScale } from "./indexScale";
 import { longNoteCheck } from "./longNote";
+import { proposalsEval, writeProposalReport } from "./proposalsEval";
 
 export function registerSpikeCommands(plugin: IndexaPlugin) {
 	const store = () => new AdapterBinaryStore(plugin.app.vault.adapter, `${plugin.manifest.dir}/spike-data`);
@@ -91,6 +92,19 @@ export function registerSpikeCommands(plugin: IndexaPlugin) {
 			const report = await clusteringBenchmark({ notes: r.notes, processed: r.processed, table: r.neighbors, vectors, labels }, resolutions);
 			await writeReport("bench-clustering.json", report);
 			return report;
+		},
+		async proposals(cuts?: number[], extra: Record<string, unknown> = {}) {
+			const r = plugin.lastResult;
+			if (!r) throw new Error("Run Analyze vault first");
+			const base = {
+				minNotes: plugin.settings.minNotesPerIndex,
+				maxIndexesPerNote: plugin.settings.maxIndexesPerNote,
+				existingIndexNames: [] as string[],
+				...extra,
+			};
+			const report = await proposalsEval(plugin.app, r, base, cuts);
+			await writeReport("proposals-eval.json", report);
+			return { ...report, note: await writeProposalReport(plugin.app, r) };
 		},
 		async hubness(k = 5) {
 			if (!plugin.lastResult) throw new Error("Run Analyze vault first");

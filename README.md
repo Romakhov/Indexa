@@ -14,11 +14,13 @@ and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Wo
 | 2 — semantic pipeline: chunking, embeddings, cache, queue | done |
 | 3 — vector search: HNSW index in a worker, rebuild from cache, top-K | done |
 | 4 — hybrid similarity graph + Louvain in the worker; clustering benchmark | done |
-| 5 — proposals: multi-index assignment, keywords, index names, unclassified, collections | next |
+| 5 — proposals: confidence + unclassified, multi-index (incl. chunks), collections, names, related | done |
+| 6 — review UI: rename, merge, ignore, add/remove notes, secondary memberships | next |
 
 What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
 progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache,
-HNSW vector index with top-K neighbours of every note, topic communities via Louvain), settings,
+HNSW vector index, topic communities via Louvain, index proposals with names, multi-index
+membership, collections and unclassified notes — see the Indexes / Unclassified tabs), settings,
 model download. Nothing in the vault is modified.
 
 Measured on a real 932-note vault (Windows, 16 threads): first analysis ≈4 min with 2 embedding
@@ -81,3 +83,16 @@ Full numbers: [`reports/bench-clustering-real-vault.json`](reports/bench-cluster
 Production path: top-K hybrid graph (semantic 70%, links 15%, tags 8%, keywords 5%, folder 2%;
 configurable) → Louvain (seeded, stable across seeds: NMI 0.92–0.98) → recursive refinement of
 communities above 15% of the vault. "Level of detail" maps to Louvain resolution.
+
+## Proposals (spec §41–51)
+
+- **Confidence**: closeness to the community centre (as a percentile) blended with neighbourhood
+  agreement. Low-confidence notes become *Unclassified* instead of polluting a topic. On the real
+  vault the notes moved to Unclassified were ones raw clustering had right only 25% of the time
+  (vs 59% for those kept). Default threshold: 77% of content notes get an index.
+- **Multi-index**: every note is scored against every index centre with its document vector and
+  its best section (chunk) vector; ~10% of notes get a second index.
+- **Collections**: notes with little own text (e.g. template movie cards) are grouped by shared
+  metadata (`type`, tag, or a folder) instead of meaning.
+- **Names**: shared title phrases (the user's own vocabulary), concentrated tags, top keywords;
+  generic names (Notes, Misc, Разное…) are never proposed; otherwise "Unnamed topic" + keywords.
