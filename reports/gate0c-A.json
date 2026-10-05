@@ -1,0 +1,90 @@
+{
+  "gate": "0c",
+  "variant": {
+    "variant": "A — шаблоны убраны + дробление",
+    "excludePrefixes": [],
+    "stripTemplates": true,
+    "refineMaxShare": 0.15
+  },
+  "templateLines": 3,
+  "refinedSplits": 3,
+  "notes": 894,
+  "shortNotes": 523,
+  "labeledNotes": 263,
+  "manualIndexes": 43,
+  "newlyEmbedded": 734,
+  "timingsMs": {
+    "scanMs": 65,
+    "embedMs": 50528,
+    "graphMs": 316,
+    "clusterMs": 43,
+    "reportMs": 59
+  },
+  "graph": {
+    "edges": 10294,
+    "k": 15
+  },
+  "sweep": [
+    {
+      "resolution": 0.5,
+      "communities": 3,
+      "atLeast3": 3,
+      "largest": 470,
+      "largestShare": 0.526,
+      "modularity": 0.744,
+      "nmiVsManual": 0.028,
+      "purityVsManual": 0.106
+    },
+    {
+      "resolution": 0.75,
+      "communities": 4,
+      "atLeast3": 4,
+      "largest": 436,
+      "largestShare": 0.488,
+      "modularity": 0.666,
+      "nmiVsManual": 0.196,
+      "purityVsManual": 0.137
+    },
+    {
+      "resolution": 1,
+      "communities": 6,
+      "atLeast3": 6,
+      "largest": 285,
+      "largestShare": 0.319,
+      "modularity": 0.597,
+      "nmiVsManual": 0.324,
+      "purityVsManual": 0.152
+    },
+    {
+      "resolution": 1.5,
+      "communities": 8,
+      "atLeast3": 8,
+      "largest": 176,
+      "largestShare": 0.197,
+      "modularity": 0.513,
+      "nmiVsManual": 0.303,
+      "purityVsManual": 0.152
+    },
+    {
+      "resolution": 2,
+      "communities": 12,
+      "atLeast3": 12,
+      "largest": 161,
+      "largestShare": 0.18,
+      "modularity": 0.454,
+      "nmiVsManual": 0.4,
+      "purityVsManual": 0.217
+    },
+    {
+      "resolution": "1 + refine",
+      "communities": 21,
+      "atLeast3": 21,
+      "largest": 120,
+      "largestShare": 0.134,
+      "modularity": null,
+      "nmiVsManual": 0.485,
+      "purityVsManual": 0.312
+    }
+  ],
+  "reportNote": "Indexa/Gate 0c — A — шаблоны убраны + дробление.md"
+}

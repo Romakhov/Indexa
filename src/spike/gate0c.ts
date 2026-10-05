@@ -9,6 +9,7 @@
 import { Notice, type App, type TFile } from "obsidian";
 import type { ClusterResult } from "../clustering/ClusterEngine";
 import { CommunityClusterEngine } from "../clustering/CommunityClusterEngine";
+import { refineCommunities } from "../clustering/ClusterRefinement";
 import { prepareNote } from "../core/MarkdownProcessor";
 import { timeSlicer } from "../core/yieldToUi";
 import type { LocalEmbeddingProvider } from "../embeddings/LocalEmbeddingProvider";
@@ -20,7 +21,39 @@ import { SpikeEmbeddingCache } from "./gate0b";
 import { nmi, purity } from "./metrics";
 
 const EXCLUDED_FOLDERS = ["Templates/", "Indexes/", "Indexa/"];
-const REPORT_PATH = "Indexa/Gate 0c — кластеры.md";
+export interface Gate0cOptions {
+	variant: string;
+	/** extra path prefixes to leave out (e.g. a metadata-defined collection) */
+	excludePrefixes: string[];
+	/** drop lines that repeat across many notes (template boilerplate, spec §16) */
+	stripTemplates: boolean;
+	/** recursive refinement of too-broad communities (spec §45–46); null = off */
+	refineMaxShare: number | null;
+}
+
+const DEFAULT_OPTS: Gate0cOptions = { variant: "raw", excludePrefixes: [], stripTemplates: false, refineMaxShare: null };
+
+/**
+ * Removes lines that occur in many notes. Lines are compared after
+ * lower-casing and replacing digits, so "Оценка: 6/10 · Год: 2015" and
+ * "Оценка: 8/10 · Год: 2019" count as the same template line.
+ */
+function stripTemplateLines(rows: NoteRow[]): number {
+	const norm = (l: string) => l.toLowerCase().replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
+	const df = new Map<string, number>();
+	const bodies = rows.map((r) => r.text.split("\n").slice(1));
+	for (const lines of bodies) for (const l of new Set(lines.map(norm))) df.set(l, (df.get(l) ?? 0) + 1);
+	const threshold = Math.max(5, Math.ceil(rows.length * 0.03));
+	const template = new Set([...df].filter(([, n]) => n >= threshold).map(([l]) => l));
+	rows.forEach((r, i) => {
+		const kept = bodies[i].filter((l) => !template.has(norm(l)));
+		const title = r.text.split("\n")[0];
+		r.text = [title, ...kept].join("\n");
+		r.short = kept.join(" ").length < 40;
+	});
+	return template.size;
+}
+
 const RESOLUTIONS = [0.5, 0.75, 1, 1.5, 2];
 const PRIMARY_RESOLUTION = 1;
 
@@ -111,7 +144,9 @@ function centrality(graph: SemanticGraph, id: string, comm: Map<string, number>)
 
 const linkPlain = (f: TFile) => `[[${f.path.replace(/\.md$/, "")}|${f.basename}]]`;
 
-export async function runGate0c(app: App, provider: LocalEmbeddingProvider, store: BinaryStore) {
+export async function runGate0c(app: App, provider: LocalEmbeddingProvider, store: BinaryStore, options: Partial<Gate0cOptions> = {}) {
+	const opts = { ...DEFAULT_OPTS, ...options };
+	const REPORT_PATH = `Indexa/Gate 0c — ${opts.variant}.md`;
 	const t: Record<string, number> = {};
 	let mark = performance.now();
 	const lap = (k: string) => {
@@ -124,7 +159,7 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 	// 1. scan + prepare
 	const files = app.vault
 		.getMarkdownFiles()
-		.filter((f) => !EXCLUDED_FOLDERS.some((p) => f.path.startsWith(p)) && !f.path.endsWith(".excalidraw.md"))
+		.filter((f) => ![...EXCLUDED_FOLDERS, ...opts.excludePrefixes].some((p) => f.path.startsWith(p)) && !f.path.endsWith(".excalidraw.md"))
 		.filter((f) => app.metadataCache.getFileCache(f)?.frontmatter?.["zk-ignore"] !== true)
 		.sort((a, b) => a.path.localeCompare(b.path));
 	const rows: NoteRow[] = [];
@@ -132,6 +167,7 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 		const p = prepareNote(await app.vault.cachedRead(f), f.basename);
 		rows.push({ file: f, text: p.text, short: p.bodyChars < 40, gold: goldLabel(app, f) });
 	}
+	const templateLines = opts.stripTemplates ? stripTemplateLines(rows) : 0;
 	lap("scanMs");
 
 	// 2. embeddings (cached)
@@ -200,6 +236,25 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 			purityVsManual: +purity(goldLabels, part).toFixed(3),
 		});
 	}
+	let refinedSplits = 0;
+	if (opts.refineMaxShare !== null) {
+		const refined = await refineCommunities(graph, primary!, engine, { resolution: PRIMARY_RESOLUTION, seed: 1 }, { maxShare: opts.refineMaxShare, minSizeToSplit: 30, maxDepth: 2 });
+		refinedSplits = refined.splits;
+		primary = refined;
+		const part = labeled.map(([, i]) => refined.communities.get(ids[i])!);
+		const sizes = [...refined.communities.values()].reduce((m, c) => m.set(c, (m.get(c) ?? 0) + 1), new Map<number, number>());
+		const sorted = [...sizes.values()].sort((a, b) => b - a);
+		sweep.push({
+			resolution: `${PRIMARY_RESOLUTION} + refine`,
+			communities: refined.count,
+			atLeast3: sorted.filter((x) => x >= 3).length,
+			largest: sorted[0],
+			largestShare: +(sorted[0] / rows.length).toFixed(3),
+			modularity: NaN,
+			nmiVsManual: +nmi(goldLabels, part).toFixed(3),
+			purityVsManual: +purity(goldLabels, part).toFixed(3),
+		});
+	}
 	lap("clusterMs");
 
 	// 5. report note
@@ -216,7 +271,9 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 		"---",
 		"indexa-report: gate-0c",
 		"---",
-		"# Indexa — Gate 0c: предложенные кластеры",
+		`# Indexa — Gate 0c: предложенные кластеры (${opts.variant})`,
+		"",
+		`Вариант: исключено ${opts.excludePrefixes.join(", ") || "ничего дополнительно"}; шаблонные строки ${opts.stripTemplates ? `удалены (${templateLines})` : "не удалялись"}; дробление крупных кластеров ${opts.refineMaxShare !== null ? `> ${opts.refineMaxShare * 100}%` : "выкл."}.`,
 		"",
 		`Заметок проанализировано: **${rows.length}** (исключены ${EXCLUDED_FOLDERS.join(", ")}, Excalidraw). Коротких (<40 символов текста): ${rows.filter((r) => r.short).length}. С ручным индексом (Zettel-link): ${labeled.length}.`,
 		"",
@@ -228,7 +285,7 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 		"|---|---|---|---|---|---|",
 		...sweep.map((s) => `| ${s.resolution} | ${s.communities} | ${s.atLeast3} | ${s.largest} (${Math.round((s.largestShare as number) * 100)}%) | ${s.nmiVsManual} | ${s.purityVsManual} |`),
 		"",
-		`## Кластеры при resolution = ${PRIMARY_RESOLUTION}`,
+		`## Кластеры при resolution = ${PRIMARY_RESOLUTION}${opts.refineMaxShare !== null ? " + дробление" : ""}`,
 		"",
 	];
 	order.forEach((c, n) => {
@@ -257,6 +314,9 @@ export async function runGate0c(app: App, provider: LocalEmbeddingProvider, stor
 
 	return {
 		gate: "0c",
+		variant: opts,
+		templateLines,
+		refinedSplits,
 		notes: rows.length,
 		shortNotes: rows.filter((r) => r.short).length,
 		labeledNotes: labeled.length,

@@ -3,7 +3,7 @@ import { LocalEmbeddingProvider } from "./embeddings/LocalEmbeddingProvider";
 import { E5_SMALL, ModelStore } from "./embeddings/ModelStore";
 import { runGate0a } from "./spike/gate0a";
 import { runGate0b } from "./spike/gate0b";
-import { runGate0c } from "./spike/gate0c";
+import { runGate0c, type Gate0cOptions } from "./spike/gate0c";
 import { AdapterBinaryStore } from "./storage/BinaryStore";
 
 export default class IndexaPlugin extends Plugin {
@@ -51,10 +51,10 @@ export default class IndexaPlugin extends Plugin {
 		return report;
 	}
 
-	async runGate0c() {
+	async runGate0c(options: Partial<Gate0cOptions> = {}) {
 		const store = new AdapterBinaryStore(this.app.vault.adapter, `${this.manifest.dir}/spike-data`);
-		const report = await runGate0c(this.app, this.getProvider(), store);
-		await this.writeReport("gate0c.json", report);
+		const report = await runGate0c(this.app, this.getProvider(), store, options);
+		await this.writeReport(`gate0c-${report.variant.variant.split(" ")[0]}.json`, report);
 		new Notice(`Gate 0c: report written to ${report.reportNote}`);
 		return report;
 	}

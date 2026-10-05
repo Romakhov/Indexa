@@ -1,0 +1,72 @@
+{
+  "gate": "0c",
+  "notes": 894,
+  "shortNotes": 5,
+  "labeledNotes": 263,
+  "manualIndexes": 43,
+  "newlyEmbedded": 894,
+  "timingsMs": {
+    "scanMs": 46,
+    "embedMs": 118073,
+    "graphMs": 304,
+    "clusterMs": 28,
+    "reportMs": 60
+  },
+  "graph": {
+    "edges": 11069,
+    "k": 15
+  },
+  "sweep": [
+    {
+      "resolution": 0.5,
+      "communities": 3,
+      "atLeast3": 3,
+      "largest": 340,
+      "largestShare": 0.38,
+      "modularity": 0.689,
+      "nmiVsManual": 0.061,
+      "purityVsManual": 0.114
+    },
+    {
+      "resolution": 0.75,
+      "communities": 4,
+      "atLeast3": 4,
+      "largest": 341,
+      "largestShare": 0.381,
+      "modularity": 0.619,
+      "nmiVsManual": 0.061,
+      "purityVsManual": 0.118
+    },
+    {
+      "resolution": 1,
+      "communities": 7,
+      "atLeast3": 7,
+      "largest": 264,
+      "largestShare": 0.295,
+      "modularity": 0.562,
+      "nmiVsManual": 0.168,
+      "purityVsManual": 0.137
+    },
+    {
+      "resolution": 1.5,
+      "communities": 10,
+      "atLeast3": 10,
+      "largest": 264,
+      "largestShare": 0.295,
+      "modularity": 0.471,
+      "nmiVsManual": 0.171,
+      "purityVsManual": 0.137
+    },
+    {
+      "resolution": 2,
+      "communities": 13,
+      "atLeast3": 13,
+      "largest": 143,
+      "largestShare": 0.16,
+      "modularity": 0.409,
+      "nmiVsManual": 0.331,
+      "purityVsManual": 0.16
+    }
+  ],
+  "reportNote": "Indexa/Gate 0c — кластеры.md"
+}

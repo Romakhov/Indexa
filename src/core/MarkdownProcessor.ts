@@ -32,7 +32,12 @@ export function prepareNote(raw: string, title: string, maxChars = 2000): Prepar
 	s = s.replace(URL, " ").replace(INLINE_CODE, " ").replace(HTML_TAG, " ");
 	s = s.replace(CALLOUT, "").replace(RULE, "").replace(TABLE_SEP, "");
 	s = s.replace(HEADING, "$1.");
-	s = s.replace(/[|*_>#=~]+/g, " ").replace(/[ \t]+/g, " ").replace(/\n{2,}/g, "\n").trim();
+	s = s.replace(/[|*_>#=~]+/g, " ").replace(/[\t  -​ 　 ]+/g, " ");
+	s = s
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0)
+		.join("\n");
 
 	const body = s.startsWith(title) ? s.slice(title.length).trim() : s;
 	return { text: `${title}\n${body}`.slice(0, maxChars), bodyChars: body.length };
