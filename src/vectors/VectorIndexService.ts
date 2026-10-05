@@ -106,10 +106,19 @@ export class VectorIndexService {
 		return this.client.knnAll(k, onProgress);
 	}
 
+	cluster(req: Parameters<AnalysisWorkerClient["cluster"]>[0]) {
+		return this.client.cluster(req);
+	}
+
 	/** @param vector a raw (uncentred) document vector */
 	search(vector: Float32Array, k: number, excludeId?: string): Promise<VectorSearchResult[]> {
 		if (!this.mean) throw new Error("Vector index is not built yet");
 		return this.client.search(centered(vector, this.mean), k, excludeId);
+	}
+
+	/** Centres a raw document vector the same way the index does (null before the first build). */
+	centre(vector: Float32Array): Float32Array | null {
+		return this.mean ? centered(vector, this.mean) : null;
 	}
 
 	/** Forget local sync state (e.g. after the worker was stopped). */

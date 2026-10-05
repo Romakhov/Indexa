@@ -17,8 +17,10 @@
     "@types/node": "^26.6.4",
     "esbuild": "^0.28.2",
     "graphology-types": "^0.24.8",
+    "hdbscan-ts": "^1.0.17",
     "obsidian": "^1.13.1",
     "typescript": "^7.0.2",
+    "umap-js": "^1.4.0",
     "vitest": "^5.0.3"
   },
   "dependencies": {

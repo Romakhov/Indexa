@@ -114,6 +114,10 @@ export class MainView extends ItemView {
 			stat("analysable", s.analysable);
 			stat("excluded", excluded, Object.entries(s.excluded).filter(([, n]) => n).map(([k, n]) => `${k}: ${n}`).join(", "));
 			stat("little own text", s.lowContent, "Grouped by metadata (collections) instead of meaning");
+			if (s.communities) {
+				const groups = s.communities.sizesTop.filter((n) => n >= this.plugin.settings.minNotesPerIndex).length;
+				stat("topic groups", groups, `${s.communities.count} communities in total; groups smaller than ${this.plugin.settings.minNotesPerIndex} notes are not index candidates`);
+			}
 			stats.createDiv({ cls: "indexa-muted", text: `Template lines ignored: ${s.templateLines} · ${(s.durationMs / 1000).toFixed(1)} s` });
 			if (s.errors.length) {
 				const err = stats.createDiv({ cls: "indexa-warn", text: `${s.errors.length} note(s) skipped. ` });

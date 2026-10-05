@@ -13,11 +13,13 @@ and proposes index notes linking related notes. Desktop only, Obsidian 1.13+. Wo
 | 1 — plugin foundation: settings, main view, vault scanner, Markdown processing | done |
 | 2 — semantic pipeline: chunking, embeddings, cache, queue | done |
 | 3 — vector search: HNSW index in a worker, rebuild from cache, top-K | done |
-| 4 — similarity graph + community detection (Louvain), clustering benchmark | next |
+| 4 — hybrid similarity graph + Louvain in the worker; clustering benchmark | done |
+| 5 — proposals: multi-index assignment, keywords, index names, unclassified, collections | next |
 
 What works now: the Indexa view (ribbon icon or command "Indexa: Open"), "Analyze vault" with stage
 progress and cancel (scanning, text preparation, chunking, local embeddings with a persistent cache,
-HNSW vector index with top-K neighbours of every note), settings, model download. Nothing in the vault is modified.
+HNSW vector index with top-K neighbours of every note, topic communities via Louvain), settings,
+model download. Nothing in the vault is modified.
 
 Measured on a real 932-note vault (Windows, 16 threads): first analysis ≈4 min with 2 embedding
 workers, re-analysis from cache 0.3 s. Each worker holds its own model copy (~0.5 GB RAM); workers are
@@ -62,3 +64,20 @@ Run Obsidian with `--remote-debugging-port=9333`, open `dev-vault`, then drive i
 `--any` also targets popout and settings windows).
 
 Spike reports are in [`reports/`](reports/).
+
+## Clustering choice (spec §40)
+
+Graph + Louvain was compared with a density-based method (UMAP → HDBSCAN) on two labelled datasets:
+a real 358-note personal vault (43 manual indexes) and 1 990 Wikipedia articles (8 topics).
+Full numbers: [`reports/bench-clustering-real-vault.json`](reports/bench-clustering-real-vault.json),
+[`reports/bench-clustering-wikipedia.json`](reports/bench-clustering-wikipedia.json).
+
+| | real vault NMI | Wikipedia purity | left unassigned | time (1 990 notes) |
+|---|---|---|---|---|
+| Louvain, hybrid edges (+ refinement) | 0.70–0.72 | 0.89–0.93 | 0% | 13–35 ms |
+| UMAP + HDBSCAN | 0.45–0.53 | 0.37–0.41 | 54–73% | 11.7 s |
+| HDBSCAN on raw vectors | 0.16 | 0.17 | 88–95% | 258 s |
+
+Production path: top-K hybrid graph (semantic 70%, links 15%, tags 8%, keywords 5%, folder 2%;
+configurable) → Louvain (seeded, stable across seeds: NMI 0.92–0.98) → recursive refinement of
+communities above 15% of the vault. "Level of detail" maps to Louvain resolution.

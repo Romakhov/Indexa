@@ -6,6 +6,9 @@ import type { NoteDocument, ProcessedNote } from "../types/NoteDocument";
 import type { EmbeddingCache } from "../embeddings/EmbeddingCache";
 import type { EmbeddingProvider } from "../embeddings/EmbeddingProvider";
 import { EmbeddingCancelled, embedNotes, type NoteToEmbed } from "../embeddings/NoteEmbedder";
+import type { EdgeWeights } from "../graph/HybridEdgeScorer";
+import { buildNoteFeatures } from "../graph/features";
+import { KeywordExtractor } from "../keywords/KeywordExtractor";
 import type { NeighborTable } from "../vectors/NeighborTable";
 import type { VectorIndexService } from "../vectors/VectorIndexService";
 import { bodyLines, processNote } from "./MarkdownProcessor";
@@ -51,6 +54,18 @@ export interface AnalysisSummary {
 		knnMs: number;
 		k: number;
 	};
+	communities?: {
+		count: number;
+		/** communities with at least minNotes members (index candidates) */
+		sizesTop: number[];
+		clusteredNotes: number;
+		modularity: number;
+		refinedSplits: number;
+		edges: number;
+		linkOnlyEdges: number;
+		resolution: number;
+		ms: number;
+	};
 }
 
 export interface EmbeddingDeps {
@@ -62,6 +77,14 @@ export interface EmbeddingDeps {
 	index?: VectorIndexService;
 	/** neighbours per note for the similarity graph */
 	topK: number;
+	/** omit to stop after the vector index */
+	clustering?: ClusteringDeps;
+}
+
+export interface ClusteringDeps {
+	resolution: number;
+	weights: EdgeWeights;
+	refineMaxShare: number | null;
 }
 
 export interface AnalysisResult {
@@ -71,6 +94,9 @@ export interface AnalysisResult {
 	chunks: Map<string, Chunk[]>;
 	/** top-K semantic neighbours of every note (Phase 3) */
 	neighbors?: NeighborTable;
+	/** community per note id (Phase 4); notes with little own text are not clustered */
+	communities?: Map<string, number>;
+	keywords?: KeywordExtractor;
 }
 
 export class AnalysisCancelled extends Error {
@@ -139,6 +165,9 @@ export class AnalysisRunner {
 		let embeddingSummary: AnalysisSummary["embedding"];
 		let vectorIndexSummary: AnalysisSummary["vectorIndex"];
 		let neighbors: NeighborTable | undefined;
+		let communities: Map<string, number> | undefined;
+		let keywords: KeywordExtractor | undefined;
+		let communitySummary: AnalysisSummary["communities"];
 		if (this.embedding) {
 			const { provider, cache, parallel } = this.embedding;
 			const toEmbed: NoteToEmbed[] = [];
@@ -205,6 +234,41 @@ export class AnalysisRunner {
 					knnMs: Math.round(performance.now() - tk),
 					k: this.embedding.topK,
 				};
+
+				const clustering = this.embedding.clustering;
+				if (clustering) {
+					check();
+					report("Detecting communities", 0, 1);
+					const content = processed.filter((p) => !p.lowContent);
+					keywords = new KeywordExtractor(content.map((p) => ({ id: p.noteId, text: p.text })));
+					const noteIds = processed.map((p) => p.noteId);
+					const res = await this.embedding.index.cluster({
+						k: this.embedding.topK,
+						noteIds,
+						features: buildNoteFeatures(noteIds, notes, keywords),
+						include: content.map((p) => p.noteId),
+						weights: clustering.weights,
+						resolution: clustering.resolution,
+						seed: 1,
+						refineMaxShare: clustering.refineMaxShare,
+					});
+					communities = new Map();
+					res.ids.forEach((id, i) => res.community[i] >= 0 && communities!.set(id, res.community[i]));
+					const sizes = new Map<number, number>();
+					for (const c of communities.values()) sizes.set(c, (sizes.get(c) ?? 0) + 1);
+					communitySummary = {
+						count: res.count,
+						sizesTop: [...sizes.values()].sort((a, b) => b - a).slice(0, 15),
+						clusteredNotes: communities.size,
+						modularity: +res.modularity.toFixed(3),
+						refinedSplits: res.refinedSplits,
+						edges: res.graph.edges,
+						linkOnlyEdges: res.graph.linkOnlyEdges,
+						resolution: clustering.resolution,
+						ms: res.ms + res.knnMs,
+					};
+					report("Detecting communities", 1, 1);
+				}
 			}
 		}
 
@@ -213,7 +277,10 @@ export class AnalysisRunner {
 			processed,
 			chunks,
 			neighbors,
+			communities,
+			keywords,
 			summary: {
+				communities: communitySummary,
 				embedding: embeddingSummary,
 				vectorIndex: vectorIndexSummary,
 				finishedAt: Date.now(),

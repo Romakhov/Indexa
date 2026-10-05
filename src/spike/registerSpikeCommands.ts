@@ -3,6 +3,7 @@
 
 import { Notice } from "obsidian";
 import { benchmarkEmbedding, type EmbeddingBenchmarkOptions } from "../benchmark/BenchmarkRunner";
+import { clusteringBenchmark } from "../benchmark/ClusteringBenchmark";
 import { cosine } from "../embeddings/EmbeddingProvider";
 import { E5_SMALL } from "../embeddings/ModelStore";
 import { PooledEmbeddingProvider } from "../embeddings/PooledEmbeddingProvider";
@@ -59,6 +60,37 @@ export function registerSpikeCommands(plugin: IndexaPlugin) {
 				await cpu.dispose();
 				await gpu.dispose();
 			}
+		},
+		/**
+		 * Labels: corpus/manifest.json topics in the dev vault, otherwise the
+		 * user's manual index (frontmatter Zettel-link).
+		 */
+		async benchClustering(resolutions?: number[]) {
+			const r = plugin.lastResult;
+			if (!r?.neighbors) throw new Error("Run Analyze vault first");
+			const labels = new Map<string, string>();
+			const manifestPath = "corpus/manifest.json";
+			if (await plugin.app.vault.adapter.exists(manifestPath)) {
+				const manifest = JSON.parse(await plugin.app.vault.adapter.read(manifestPath)) as { file: string; topic: string }[];
+				const topic = new Map(manifest.map((m) => ["corpus/" + m.file, m.topic]));
+				r.notes.forEach((n) => topic.has(n.path) && labels.set(n.id, topic.get(n.path)!));
+			} else {
+				for (const n of r.notes) {
+					const raw = n.frontmatter["Zettel-link"];
+					const first = Array.isArray(raw) ? raw[0] : raw;
+					const m = typeof first === "string" ? first.match(/\[\[([^\]|#]+)/) : null;
+					if (m) labels.set(n.id, m[1].split("/").pop()!.trim());
+				}
+			}
+			const vectors = new Map<string, Float32Array>();
+			for (const id of r.neighbors.ids) {
+				const e = plugin.getCache().peek(id);
+				const c = e && plugin.getVectorIndex().centre(e.documentVector);
+				if (c) vectors.set(id, c);
+			}
+			const report = await clusteringBenchmark({ notes: r.notes, processed: r.processed, table: r.neighbors, vectors, labels }, resolutions);
+			await writeReport("bench-clustering.json", report);
+			return report;
 		},
 		async hubness(k = 5) {
 			if (!plugin.lastResult) throw new Error("Run Analyze vault first");

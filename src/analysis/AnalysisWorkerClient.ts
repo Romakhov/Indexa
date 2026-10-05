@@ -1,6 +1,6 @@
 import type { NeighborTable } from "../vectors/NeighborTable";
 import type { VectorSearchResult } from "../vectors/VectorIndex";
-import type { AnalysisRequest, AnalysisResponse, IndexStats } from "./protocol";
+import type { AnalysisRequest, AnalysisResponse, ClusterResponse, IndexStats } from "./protocol";
 
 type Pending = { resolve: (v: any) => void; reject: (e: Error) => void; onProgress?: (done: number, total: number) => void };
 type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never;
@@ -41,6 +41,7 @@ export class AnalysisWorkerClient {
 		if (msg.type === "error") p.reject(new Error(msg.message));
 		else if (msg.type === "ok") p.resolve(msg.stats);
 		else if (msg.type === "search") p.resolve(msg.results);
+		else if (msg.type === "cluster") p.resolve(msg.result);
 		else p.resolve(msg.table);
 	}
 
@@ -66,6 +67,10 @@ export class AnalysisWorkerClient {
 
 	knnAll(k: number, onProgress?: Pending["onProgress"]): Promise<NeighborTable> {
 		return this.request({ type: "knnAll", k }, [], onProgress);
+	}
+
+	cluster(req: Omit<Extract<AnalysisRequest, { type: "cluster" }>, "id" | "type">): Promise<ClusterResponse> {
+		return this.request({ type: "cluster", ...req });
 	}
 
 	stats(): Promise<IndexStats> {

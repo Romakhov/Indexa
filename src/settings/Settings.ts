@@ -1,3 +1,5 @@
+import { DEFAULT_EDGE_WEIGHTS, type EdgeWeights } from "../graph/HybridEdgeScorer";
+
 export interface IndexaSettings {
 	version: 1;
 
@@ -33,6 +35,8 @@ export interface IndexaSettings {
 	topK: number;
 	/** parallel embedding workers; each holds its own model copy (~300 MB RAM) */
 	embeddingWorkers: number;
+	/** hybrid edge weights (spec §35); stored in data.json, not shown in the UI */
+	edgeWeights: EdgeWeights;
 	debugLogging: boolean;
 }
 
@@ -56,6 +60,7 @@ export const DEFAULT_SETTINGS: IndexaSettings = {
 	semanticThreshold: 50,
 	topK: 15,
 	embeddingWorkers: 2,
+	edgeWeights: { ...DEFAULT_EDGE_WEIGHTS },
 	debugLogging: false,
 };
 
@@ -64,6 +69,13 @@ const clamp = (v: unknown, min: number, max: number, def: number) =>
 
 const stringList = (v: unknown, def: string[]) =>
 	Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean) : def;
+
+function normalizeWeights(raw: unknown): EdgeWeights {
+	const w = (raw && typeof raw === "object" ? raw : {}) as Partial<Record<keyof EdgeWeights, unknown>>;
+	const out = { ...DEFAULT_EDGE_WEIGHTS };
+	for (const k of Object.keys(out) as (keyof EdgeWeights)[]) out[k] = clamp(w[k], 0, 1, DEFAULT_EDGE_WEIGHTS[k]);
+	return out;
+}
 
 /** Merges stored data over defaults and repairs invalid values from older versions. */
 export function normalizeSettings(raw: unknown): IndexaSettings {
@@ -83,5 +95,6 @@ export function normalizeSettings(raw: unknown): IndexaSettings {
 		semanticThreshold: clamp(s.semanticThreshold, 0, 100, DEFAULT_SETTINGS.semanticThreshold),
 		topK: clamp(s.topK, 5, 50, DEFAULT_SETTINGS.topK),
 		embeddingWorkers: Math.round(clamp(s.embeddingWorkers, 1, 4, DEFAULT_SETTINGS.embeddingWorkers)),
+		edgeWeights: normalizeWeights(r.edgeWeights),
 	};
 }

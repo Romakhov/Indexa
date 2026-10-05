@@ -1,0 +1,210 @@
+{
+  "notes": 1990,
+  "labeled": 1990,
+  "distinctLabels": 8,
+  "graphStats": {
+    "louvain-semantic": {
+      "nodes": 1990,
+      "edges": 21380,
+      "knnEdges": 21380,
+      "linkOnlyEdges": 0,
+      "semanticP5": 0.2594567537307739,
+      "semanticP95": 0.5113104581832886
+    },
+    "louvain-hybrid": {
+      "nodes": 1990,
+      "edges": 21380,
+      "knnEdges": 21380,
+      "linkOnlyEdges": 0,
+      "semanticP5": 0.2594567537307739,
+      "semanticP95": 0.5113104581832886
+    },
+    "louvain-hybrid+refine": {
+      "nodes": 1990,
+      "edges": 21380,
+      "knnEdges": 21380,
+      "linkOnlyEdges": 0,
+      "semanticP5": 0.2594567537307739,
+      "semanticP95": 0.5113104581832886
+    }
+  },
+  "seedStabilityNmi": 0.979,
+  "results": [
+    {
+      "variant": "louvain-semantic r=0.5",
+      "clusters": 12,
+      "clustersAtLeast3": 12,
+      "largestShare": 0.173,
+      "noiseShare": 0,
+      "nmi": 0.677,
+      "nmiClustered": 0.677,
+      "purity": 0.726,
+      "ms": 19
+    },
+    {
+      "variant": "louvain-semantic r=1",
+      "clusters": 14,
+      "clustersAtLeast3": 14,
+      "largestShare": 0.163,
+      "noiseShare": 0,
+      "nmi": 0.689,
+      "nmiClustered": 0.689,
+      "purity": 0.79,
+      "ms": 16
+    },
+    {
+      "variant": "louvain-semantic r=2",
+      "clusters": 19,
+      "clustersAtLeast3": 18,
+      "largestShare": 0.104,
+      "noiseShare": 0,
+      "nmi": 0.713,
+      "nmiClustered": 0.713,
+      "purity": 0.885,
+      "ms": 14
+    },
+    {
+      "variant": "louvain-semantic r=3",
+      "clusters": 21,
+      "clustersAtLeast3": 20,
+      "largestShare": 0.074,
+      "noiseShare": 0,
+      "nmi": 0.702,
+      "nmiClustered": 0.702,
+      "purity": 0.901,
+      "ms": 16
+    },
+    {
+      "variant": "louvain-hybrid r=0.5",
+      "clusters": 12,
+      "clustersAtLeast3": 12,
+      "largestShare": 0.173,
+      "noiseShare": 0,
+      "nmi": 0.675,
+      "nmiClustered": 0.675,
+      "purity": 0.725,
+      "ms": 16
+    },
+    {
+      "variant": "louvain-hybrid r=1",
+      "clusters": 14,
+      "clustersAtLeast3": 14,
+      "largestShare": 0.157,
+      "noiseShare": 0,
+      "nmi": 0.694,
+      "nmiClustered": 0.694,
+      "purity": 0.793,
+      "ms": 13
+    },
+    {
+      "variant": "louvain-hybrid r=2",
+      "clusters": 18,
+      "clustersAtLeast3": 18,
+      "largestShare": 0.106,
+      "noiseShare": 0,
+      "nmi": 0.716,
+      "nmiClustered": 0.716,
+      "purity": 0.885,
+      "ms": 13
+    },
+    {
+      "variant": "louvain-hybrid r=3",
+      "clusters": 20,
+      "clustersAtLeast3": 20,
+      "largestShare": 0.074,
+      "noiseShare": 0,
+      "nmi": 0.705,
+      "nmiClustered": 0.705,
+      "purity": 0.904,
+      "ms": 12
+    },
+    {
+      "variant": "louvain-hybrid+refine r=0.5",
+      "clusters": 20,
+      "clustersAtLeast3": 20,
+      "largestShare": 0.076,
+      "noiseShare": 0,
+      "nmi": 0.705,
+      "nmiClustered": 0.705,
+      "purity": 0.922,
+      "ms": 50
+    },
+    {
+      "variant": "louvain-hybrid+refine r=1",
+      "clusters": 23,
+      "clustersAtLeast3": 23,
+      "largestShare": 0.077,
+      "noiseShare": 0,
+      "nmi": 0.71,
+      "nmiClustered": 0.71,
+      "purity": 0.927,
+      "ms": 35
+    },
+    {
+      "variant": "louvain-hybrid+refine r=2",
+      "clusters": 28,
+      "clustersAtLeast3": 28,
+      "largestShare": 0.074,
+      "noiseShare": 0,
+      "nmi": 0.704,
+      "nmiClustered": 0.704,
+      "purity": 0.923,
+      "ms": 35
+    },
+    {
+      "variant": "louvain-hybrid+refine r=3",
+      "clusters": 20,
+      "clustersAtLeast3": 20,
+      "largestShare": 0.074,
+      "noiseShare": 0,
+      "nmi": 0.705,
+      "nmiClustered": 0.705,
+      "purity": 0.904,
+      "ms": 8
+    },
+    {
+      "variant": "umap+hdbscan mcs=3",
+      "clusters": 140,
+      "clustersAtLeast3": 140,
+      "largestShare": 0.005,
+      "noiseShare": 0.695,
+      "nmi": 0.293,
+      "nmiClustered": 0.575,
+      "purity": 0.389,
+      "ms": 11204
+    },
+    {
+      "variant": "umap+hdbscan mcs=5",
+      "clusters": 81,
+      "clustersAtLeast3": 81,
+      "largestShare": 0.008,
+      "noiseShare": 0.727,
+      "nmi": 0.288,
+      "nmiClustered": 0.625,
+      "purity": 0.367,
+      "ms": 11844
+    },
+    {
+      "variant": "umap+hdbscan mcs=10",
+      "clusters": 54,
+      "clustersAtLeast3": 54,
+      "largestShare": 0.013,
+      "noiseShare": 0.675,
+      "nmi": 0.325,
+      "nmiClustered": 0.652,
+      "purity": 0.413,
+      "ms": 11692
+    },
+    {
+      "variant": "hdbscan raw-384d mcs=5",
+      "clusters": 17,
+      "clustersAtLeast3": 17,
+      "largestShare": 0.005,
+      "noiseShare": 0.949,
+      "nmi": 0.087,
+      "nmiClustered": 0.836,
+      "purity": 0.173,
+      "ms": 258367
+    }
+  ]
+}

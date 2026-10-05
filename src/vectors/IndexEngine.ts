@@ -79,6 +79,10 @@ export class IndexEngine {
 		}
 	}
 
+	vectorOf(id: string): Float32Array | undefined {
+		return this.vectors.get(id);
+	}
+
 	ids(): string[] {
 		return [...this.vectors.keys()];
 	}

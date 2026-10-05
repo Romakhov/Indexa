@@ -1,6 +1,8 @@
 import Graph from "graphology";
 import { timeSlicer } from "../core/yieldToUi";
+import type { NeighborTable } from "../vectors/NeighborTable";
 import type { VectorSearchResult } from "../vectors/VectorIndex";
+import { HybridEdgeScorer, type EdgeWeights, type NoteFeatures } from "./HybridEdgeScorer";
 
 export type SemanticGraph = Graph<Record<string, never>, { weight: number; similarity: number }>;
 
@@ -13,7 +15,7 @@ export interface GraphBuildOptions {
 	rescale: boolean;
 }
 
-/** Builds a sparse undirected graph from per-node top-K neighbour lists. */
+/** Builds a sparse undirected graph from per-node top-K neighbour lists (semantic only). */
 export async function buildSemanticGraph(
 	neighbours: Map<string, VectorSearchResult[]>,
 	opts: GraphBuildOptions = { rescale: true },
@@ -35,4 +37,79 @@ export async function buildSemanticGraph(
 		}
 	}
 	return graph;
+}
+
+export interface HybridGraphInput {
+	table: NeighborTable;
+	/** rows of table.ids that take part (e.g. notes with enough own text) */
+	include: boolean[];
+	features: NoteFeatures[];
+	weights: EdgeWeights;
+	/** cosine similarity between two rows, for link-only pairs outside the kNN lists */
+	similarity: (i: number, j: number) => number;
+}
+
+export interface HybridGraphStats {
+	nodes: number;
+	edges: number;
+	knnEdges: number;
+	linkOnlyEdges: number;
+	semanticP5: number;
+	semanticP95: number;
+}
+
+const quantile = (sorted: Float32Array, q: number) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : 0);
+
+/**
+ * Sparse hybrid graph (spec §34–37): nodes = included notes, edges = top-K
+ * semantic neighbours plus pairs the user already linked. Semantic similarity
+ * is normalised to [0, 1] between the 5th and 95th percentile of kNN scores,
+ * then combined with structural signals by HybridEdgeScorer.
+ */
+export function buildHybridGraph(input: HybridGraphInput): { graph: SemanticGraph; stats: HybridGraphStats } {
+	const { table, include, features, weights } = input;
+	const scorer = new HybridEdgeScorer(features, weights);
+	const graph: SemanticGraph = new Graph({ type: "undirected", multi: false, allowSelfLoops: false });
+	table.ids.forEach((id, i) => include[i] && graph.addNode(id));
+
+	const sims: number[] = [];
+	for (let i = 0; i < table.ids.length; i++) {
+		if (!include[i]) continue;
+		for (let j = 0; j < table.k; j++) {
+			const n = table.neighbors[i * table.k + j];
+			if (n >= 0 && include[n]) sims.push(table.scores[i * table.k + j]);
+		}
+	}
+	const sorted = Float32Array.from(sims).sort();
+	const p5 = quantile(sorted, 0.05);
+	const p95 = quantile(sorted, 0.95);
+	const norm = (s: number) => Math.min(1, Math.max(0, (s - p5) / Math.max(1e-6, p95 - p5)));
+
+	let knnEdges = 0;
+	for (let i = 0; i < table.ids.length; i++) {
+		if (!include[i]) continue;
+		for (let j = 0; j < table.k; j++) {
+			const n = table.neighbors[i * table.k + j];
+			if (n < 0 || !include[n] || n === i) continue;
+			const a = table.ids[i];
+			const b = table.ids[n];
+			if (graph.hasEdge(a, b)) continue;
+			const sim = table.scores[i * table.k + j];
+			graph.addEdge(a, b, { similarity: sim, weight: Math.max(1e-6, scorer.score(i, n, norm(sim))) });
+			knnEdges++;
+		}
+	}
+	let linkOnlyEdges = 0;
+	if (weights.links > 0) {
+		for (const [i, j] of scorer.linkPairs()) {
+			if (!include[i] || !include[j]) continue;
+			const a = table.ids[i];
+			const b = table.ids[j];
+			if (graph.hasEdge(a, b)) continue;
+			const sim = input.similarity(i, j);
+			graph.addEdge(a, b, { similarity: sim, weight: Math.max(1e-6, scorer.score(i, j, norm(sim))) });
+			linkOnlyEdges++;
+		}
+	}
+	return { graph, stats: { nodes: graph.order, edges: graph.size, knnEdges, linkOnlyEdges, semanticP5: p5, semanticP95: p95 } };
 }

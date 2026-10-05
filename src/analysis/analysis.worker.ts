@@ -2,6 +2,8 @@
 // Analysis worker: vector index (and, from Phase 4, graph + clustering).
 // Holds no model and no note text; only ids and vectors. No network access.
 
+import { clusterNotes } from "../clustering/clusterNotes";
+import type { NoteFeatures } from "../graph/HybridEdgeScorer";
 import type { BinaryStore } from "../storage/BinaryStore";
 import { BruteForceVectorIndex } from "../vectors/BruteForceVectorIndex";
 import { HnswVectorIndex } from "../vectors/HnswVectorIndex";
@@ -56,6 +58,38 @@ ctx.onmessage = async (ev: MessageEvent<AnalysisRequest>) => {
 			}
 			case "stats":
 				return post({ type: "ok", id: req.id, stats: stats() });
+			case "cluster": {
+				const tk = performance.now();
+				const table = await engine.knnAll(req.k);
+				const knnMs = Math.round(performance.now() - tk);
+				// align feature rows (and their link targets) with the table rows
+				const rowOf = new Map(table.ids.map((id, i) => [id, i]));
+				const empty: NoteFeatures = { links: [], tags: [], keywords: [], folder: "" };
+				const features: NoteFeatures[] = table.ids.map(() => empty);
+				req.noteIds.forEach((id, i) => {
+					const row = rowOf.get(id);
+					if (row === undefined) return;
+					const f = req.features[i];
+					const links = f.links.map((l) => rowOf.get(req.noteIds[l])).filter((r): r is number => r !== undefined);
+					features[row] = { ...f, links };
+				});
+				const included = new Set(req.include);
+				const include = table.ids.map((id) => included.has(id));
+				const sim = (i: number, j: number) => {
+					const a = engine.vectorOf(table.ids[i])!;
+					const b = engine.vectorOf(table.ids[j])!;
+					let s = 0;
+					for (let t = 0; t < a.length; t++) s += a[t] * b[t];
+					return s;
+				};
+				const res = await clusterNotes(table, include, features, sim, {
+					weights: req.weights,
+					resolution: req.resolution,
+					seed: req.seed,
+					refineMaxShare: req.refineMaxShare,
+				});
+				return post({ type: "cluster", id: req.id, result: { ...res, ids: table.ids, knnMs } }, [res.community.buffer]);
+			}
 		}
 	} catch (e) {
 		post({ type: "error", id: req.id, message: e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e) });

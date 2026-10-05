@@ -1,6 +1,7 @@
 import { debounce, Notice, Plugin, TFile } from "obsidian";
 import { AnalysisWorkerClient } from "./analysis/AnalysisWorkerClient";
 import { AnalysisCancelled, AnalysisRunner, type AnalysisResult, type AnalysisSummary } from "./core/AnalysisRunner";
+import { resolutionForDetail } from "./clustering/clusterNotes";
 import { VectorIndexService } from "./vectors/VectorIndexService";
 import { NoteIdRegistry } from "./core/NoteIdRegistry";
 import { ObsidianVaultScanner } from "./core/VaultScanner";
@@ -163,6 +164,11 @@ export default class IndexaPlugin extends Plugin {
 					parallel: this.settings.embeddingWorkers,
 					index: this.getVectorIndex(),
 					topK: this.settings.topK,
+					clustering: {
+						resolution: resolutionForDetail(this.settings.detailLevel),
+						weights: this.settings.edgeWeights,
+						refineMaxShare: 0.15,
+					},
 				}
 			: undefined;
 		if (!embedding) new Notice("Local semantic model is not installed: only text preparation will run.");
