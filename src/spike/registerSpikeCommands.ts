@@ -14,6 +14,7 @@ import { runGate0b } from "./gate0b";
 import { runGate0c, type Gate0cOptions } from "./gate0c";
 import { hubnessExperiment } from "./hubness";
 import { indexScale } from "./indexScale";
+import { labelBankExperiment } from "./labelBank";
 import { longNoteCheck } from "./longNote";
 import { proposalsEval, writeProposalReport } from "./proposalsEval";
 
@@ -106,6 +107,7 @@ export function registerSpikeCommands(plugin: IndexaPlugin) {
 			await writeReport("proposals-eval.json", report);
 			return { ...report, note: await writeProposalReport(plugin.app, r) };
 		},
+		labelBank: () => labelBankExperiment(plugin),
 		async hubness(k = 5) {
 			if (!plugin.lastResult) throw new Error("Run Analyze vault first");
 			const report = hubnessExperiment(plugin.app, plugin.lastResult, plugin.getCache(), k);
